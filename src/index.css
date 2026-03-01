@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 210 20% 96%;
+    --foreground: 215 28% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+    --primary: 174 72% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 93%;
+    --secondary-foreground: 215 28% 17%;
+    --muted: 210 20% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 174 72% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 16% 88%;
+    --input: 210 20% 93%;
+    --ring: 174 72% 40%;
+    --radius: 0.75rem;
+  }
+
+  .theme-dark {
+    --background: 215 35% 10%;
+    --foreground: 210 40% 95%;
+    --card: 215 32% 13%;
+    --card-foreground: 210 40% 95%;
+    --secondary: 215 30% 17%;
+    --secondary-foreground: 210 40% 95%;
+    --muted: 215 30% 17%;
+    --muted-foreground: 215 20% 55%;
+    --border: 215 28% 20%;
+    --input: 215 30% 17%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .hh-card { @apply bg-card border border-border rounded-xl shadow-sm; }
+  .hh-card-hover { @apply hh-card hover:shadow-md transition-shadow duration-200; }
+
+  .btn-primary {
+    @apply bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg px-4 py-2.5
+           transition-all duration-200 active:scale-[0.98] flex items-center gap-2;
+  }
+  .btn-secondary {
+    @apply bg-secondary hover:bg-secondary/80 text-foreground font-medium rounded-lg px-4 py-2.5
+           border border-border transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-3 py-2
+           transition-all duration-200;
+  }
+
+  .hh-input {
+    @apply bg-card border border-border rounded-lg px-3 py-2.5 text-foreground
+           placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/40
+           focus:border-teal-500 transition-all duration-200 w-full text-sm;
+  }
+
+  .stat-card { @apply hh-card p-5; }
+
+  .badge { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium; }
+  .badge-high { @apply badge bg-red-100 text-red-700; }
+  .badge-medium { @apply badge bg-amber-100 text-amber-700; }
+  .badge-low { @apply badge bg-green-100 text-green-700; }
+  .badge-urgent { @apply badge bg-red-100 text-red-700; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; }
+
+/* Quill */
+.ql-toolbar.ql-snow {
+  background: hsl(var(--secondary)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+.ql-container.ql-snow {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-top: none !important;
+  border-radius: 0 0 8px 8px !important;
+  min-height: 180px;
+}
+.ql-editor { color: hsl(var(--foreground)) !important; font-family: inherit !important; font-size: 14px !important; }
+.ql-stroke { stroke: hsl(var(--muted-foreground)) !important; }
+.ql-fill { fill: hsl(var(--muted-foreground)) !important; }
+
+input[type=range] { accent-color: #0d9488; }
+
+.animate-in { animation: slide-up 0.3s ease-out; }
+.page-transition { animation: slide-up 0.3s ease-out; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
