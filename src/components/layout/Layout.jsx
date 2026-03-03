@@ -4,11 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
   LayoutDashboard, CheckSquare, BookOpen, Calendar, Target, Flame,
-  Heart, Sparkles, Settings, LogOut, Menu, X, Bell, Moon, Sun, ChevronRight,
-  DollarSign // ✅ Added import
+  Heart, Sparkles, Settings, LogOut, Menu, X, Bell, Moon, Sun, ChevronRight
 } from 'lucide-react';
 
-// ✅ Added Finance to navItems
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
@@ -18,7 +16,6 @@ const navItems = [
   { to: '/habits', icon: Flame, label: 'Habits' },
   { to: '/mood', icon: Heart, label: 'Mood' },
   { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
-  { to: '/finance', icon: DollarSign, label: 'Finance' }, // ✅ New Finance item
 ];
 
 export default function Layout() {

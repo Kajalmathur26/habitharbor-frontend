@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { habitService } from '../services';
-import { Plus, Flame, Trash2, X } from 'lucide-react';
+import { Plus, Flame, Trash2, X, RotateCcw, History } from 'lucide-react';
 import { format, eachDayOfInterval, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -11,17 +11,11 @@ export default function HabitsPage() {
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    icon: '⭐',
-    color: '#8B5CF6',
-    frequency: 'daily',
-    target_count: 1,
-  });
-
+  const [historyHabit, setHistoryHabit] = useState(null);
+  const [form, setForm] = useState({ name: '', description: '', icon: '⭐', color: '#8B5CF6', frequency: 'daily', target_count: 1 });
   const today = new Date().toISOString().split('T')[0];
   const last7Days = eachDayOfInterval({ start: subDays(new Date(), 6), end: new Date() });
+  const last30Days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
 
   useEffect(() => { loadHabits(); }, []);
 
@@ -45,6 +39,24 @@ export default function HabitsPage() {
     } catch { toast.error('Failed to create habit'); }
   };
 
+  const logHabit = async (habit) => {
+    const alreadyDone = habit.habit_logs?.some(l => l.log_date === today && l.completed);
+    if (alreadyDone) return;
+    try {
+      await habitService.log(habit.id, {});
+      await loadHabits();
+      toast.success(`${habit.icon} ${habit.name} logged!`);
+    } catch { toast.error('Failed to log'); }
+  };
+
+  const unlogHabit = async (habit) => {
+    try {
+      await habitService.unlog(habit.id);
+      await loadHabits();
+      toast.success(`↩️ ${habit.name} unmarked`);
+    } catch { toast.error('Failed to unlog'); }
+  };
+
   const deleteHabit = async (id) => {
     if (!confirm('Delete habit?')) return;
     try {
@@ -60,34 +72,6 @@ export default function HabitsPage() {
   };
 
   const completedToday = habits.filter(h => h.habit_logs?.some(l => l.log_date === today && l.completed)).length;
-
-  // ── TOGGLE HABIT ──
-  const toggleHabit = async (habit) => {
-    // Optimistic update
-    setHabits(prev => prev.map(h => {
-      if (h.id !== habit.id) return h;
-
-      const todayLog = h.habit_logs?.find(l => l.log_date === today);
-      if (todayLog) {
-        todayLog.completed = !todayLog.completed;
-        return { ...h };
-      } else {
-        const newLog = { log_date: today, completed: true };
-        return { ...h, habit_logs: [...(h.habit_logs || []), newLog] };
-      }
-    }));
-
-    try {
-      await habitService.log(habit.id);
-      // Sync with backend
-      const res = await habitService.getAll();
-      setHabits(res.data.habits || []);
-    } catch {
-      toast.error('Failed to update habit');
-      const res = await habitService.getAll();
-      setHabits(res.data.habits || []);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -106,7 +90,9 @@ export default function HabitsPage() {
         <div className="glass-card p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-foreground">Today's Progress</span>
-            <span className="text-sm text-violet-400">{habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%</span>
+            <span className="text-sm text-violet-400 font-semibold">
+              {habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%
+            </span>
           </div>
           <div className="h-3 bg-secondary rounded-full overflow-hidden">
             <div
@@ -128,18 +114,26 @@ export default function HabitsPage() {
       ) : (
         <div className="space-y-3">
           {habits.map(habit => {
-            const doneToday = isLoggedOn(habit, new Date());
+            const doneToday = habit.habit_logs?.some(l => l.log_date === today && l.completed);
             return (
-              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-75' : ''}`}>
+              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-80' : ''}`}>
                 <div className="flex items-center gap-4">
-                  {/* Complete / Toggle button */}
-                  <button
-                    onClick={() => toggleHabit(habit)}
-                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
-                    style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
-                  >
-                    {doneToday ? '✅' : habit.icon}
-                  </button>
+                  {/* Complete / Undo button */}
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => doneToday ? unlogHabit(habit) : logHabit(habit)}
+                      className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
+                      style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
+                      title={doneToday ? 'Click to undo' : 'Mark as done'}
+                    >
+                      {doneToday ? '✅' : habit.icon}
+                    </button>
+                    {doneToday && (
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                        <RotateCcw size={9} /> undo
+                      </span>
+                    )}
+                  </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
@@ -173,17 +167,71 @@ export default function HabitsPage() {
                     <p className="text-xs text-muted-foreground">streak</p>
                   </div>
 
-                  {/* Delete */}
-                  <button
-                    onClick={() => deleteHabit(habit.id)}
-                    className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all flex-shrink-0"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                    <button
+                      onClick={() => setHistoryHabit(habit)}
+                      className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                      title="View history"
+                    >
+                      <History size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteHabit(habit.id)}
+                      className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* History Modal */}
+      {historyHabit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 glow-border animate-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+                {historyHabit.icon} {historyHabit.name} — 30 Day History
+              </h2>
+              <button onClick={() => setHistoryHabit(null)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={18} /></button>
+            </div>
+            <div className="mb-4">
+              <div className="flex items-center gap-4 text-sm mb-4">
+                <span className="text-muted-foreground">🔥 Current streak: <strong className="text-foreground">{historyHabit.current_streak}</strong></span>
+                <span className="text-muted-foreground">Best: <strong className="text-foreground">{historyHabit.longest_streak}</strong></span>
+              </div>
+              <div className="grid grid-cols-10 gap-1">
+                {last30Days.map(day => {
+                  const logged = isLoggedOn(historyHabit, day);
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className="aspect-square rounded-md"
+                      style={{
+                        background: logged ? historyHabit.color + '80' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${logged ? historyHabit.color + '60' : 'rgba(255,255,255,0.08)'}`
+                      }}
+                      title={`${format(day, 'MMM d')} — ${logged ? '✅ Done' : 'Not done'}`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                <div className="w-3 h-3 rounded-sm" style={{ background: historyHabit.color + '80' }} />
+                <span>Completed</span>
+                <div className="w-3 h-3 rounded-sm bg-white/5 ml-2" />
+                <span>Missed</span>
+              </div>
+            </div>
+            <button onClick={() => setHistoryHabit(null)} className="w-full py-2.5 rounded-xl border border-border text-muted-foreground text-sm hover:text-foreground transition-all">
+              Close
+            </button>
+          </div>
         </div>
       )}
 

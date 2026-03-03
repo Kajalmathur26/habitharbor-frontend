@@ -1,316 +1,300 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { moodService } from '@/services';
-import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { moodService } from '../services';
+import { Heart, TrendingUp, Edit2 } from 'lucide-react';
+import { format, subDays, eachDayOfInterval } from 'date-fns';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, BarChart, Bar
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts';
-import { Smile, TrendingUp, Edit2, Check, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const MOODS = [
-  { score: 10, emoji: '🌟', label: 'Amazing' },
-  { score: 8, emoji: '😊', label: 'Happy' },
-  { score: 6, emoji: '😐', label: 'Neutral' },
-  { score: 4, emoji: '😔', label: 'Sad' },
-  { score: 2, emoji: '😢', label: 'Terrible' },
+  { score: 10, label: 'amazing', emoji: '🤩', color: '#10B981' },
+  { score: 8, label: 'great', emoji: '😄', color: '#34D399' },
+  { score: 6, label: 'good', emoji: '🙂', color: '#60A5FA' },
+  { score: 5, label: 'okay', emoji: '😐', color: '#A78BFA' },
+  { score: 3, label: 'bad', emoji: '😕', color: '#F59E0B' },
+  { score: 1, label: 'terrible', emoji: '😢', color: '#EF4444' },
 ];
 
-const EMOTION_TAGS = ['Anxious', 'Calm', 'Energetic', 'Tired', 'Focused', 'Distracted', 'Grateful', 'Stressed', 'Excited', 'Lonely', 'Motivated', 'Overwhelmed'];
-
-const scoreColor = (s) => {
-  if (!s) return '#e5e7eb';
-  if (s >= 8) return '#10b981';
-  if (s >= 6) return '#f59e0b';
-  if (s >= 4) return '#f97316';
-  return '#ef4444';
-};
+const EMOTIONS = ['Happy', 'Calm', 'Anxious', 'Excited', 'Sad', 'Frustrated', 'Grateful', 'Tired', 'Focused', 'Hopeful'];
 
 export default function MoodPage() {
   const [moods, setMoods] = useState([]);
-  const [trend7, setTrend7] = useState([]);
-  const [trend30, setTrend30] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [trendDays, setTrendDays] = useState(7);
-
-  const [score, setScore] = useState(7);
-  const [emotions, setEmotions] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [selectedEmotions, setSelectedEmotions] = useState([]);
   const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false); // editing today's mood
+  const [chartRange, setChartRange] = useState('30'); // '7' or '30'
+  const today = new Date().toISOString().split('T')[0];
+  const todayMood = moods.find(m => m.log_date === today);
 
-  const [editingId, setEditingId] = useState(null);
-  const [editScore, setEditScore] = useState(7);
-  const [editNotes, setEditNotes] = useState('');
+  useEffect(() => { loadData(); }, []);
 
-  const load = useCallback(async () => {
+  const loadData = async () => {
     try {
-      setLoading(true);
-      const [moodsRes, t7, t30] = await Promise.all([
-        moodAPI.getAll(),
-        moodAPI.getTrend(7),
-        moodAPI.getTrend(30),
-      ]);
-      setMoods(moodsRes.data.data || []);
-      setTrend7(t7.data.data || []);
-      setTrend30(t30.data.data || []);
+      const [moodsRes, statsRes] = await Promise.all([moodService.getAll(), moodService.getStats()]);
+      setMoods(moodsRes.data.moods);
+      setStats(statsRes.data);
     } catch { toast.error('Failed to load mood data'); }
     finally { setLoading(false); }
-  }, []);
+  };
 
-  useEffect(() => { load(); }, [load]);
+  const startEdit = () => {
+    if (!todayMood) return;
+    setSelectedMood(MOODS.find(m => m.label === todayMood.mood_label) || null);
+    setSelectedEmotions(todayMood.emotions || []);
+    setNotes(todayMood.notes || '');
+    setEditMode(true);
+  };
 
-  const handleLog = async () => {
+  const logMood = async () => {
+    if (!selectedMood) return toast.error('Please select a mood');
+    setSaving(true);
     try {
-      setSubmitting(true);
-      const res = await moodAPI.create({ mood_score: score, emotions, notes });
-      setMoods(prev => [res.data.data, ...prev]);
-      setNotes('');
-      setEmotions([]);
-      await load(); // refresh trends
-      toast.success('Mood logged!');
-    } catch { toast.error('Failed to log mood'); }
-    finally { setSubmitting(false); }
+      if (editMode && todayMood) {
+        await moodService.update(todayMood.id, {
+          mood_score: selectedMood.score,
+          mood_label: selectedMood.label,
+          emotions: selectedEmotions,
+          notes
+        });
+        toast.success(`Mood updated! ${selectedMood.emoji}`);
+      } else {
+        await moodService.log({ mood_score: selectedMood.score, mood_label: selectedMood.label, emotions: selectedEmotions, notes });
+        toast.success(`Mood logged! ${selectedMood.emoji}`);
+      }
+      setSelectedMood(null); setSelectedEmotions([]); setNotes(''); setEditMode(false);
+      await loadData();
+    } catch { toast.error('Failed to save mood'); }
+    finally { setSaving(false); }
   };
 
-  const startEdit = (m) => {
-    setEditingId(m.id);
-    setEditScore(m.mood_score);
-    setEditNotes(m.notes || '');
+  const toggleEmotion = (emotion) => {
+    setSelectedEmotions(prev => prev.includes(emotion) ? prev.filter(e => e !== emotion) : [...prev, emotion]);
   };
 
-  const saveEdit = async (id) => {
-    try {
-      const res = await moodAPI.update(id, { mood_score: editScore, notes: editNotes });
-      setMoods(prev => prev.map(m => m.id === id ? res.data.data : m));
-      setEditingId(null);
-      await load();
-      toast.success('Mood updated!');
-    } catch { toast.error('Failed to update'); }
+  const days = parseInt(chartRange);
+  const dateRange = eachDayOfInterval({ start: subDays(new Date(), days - 1), end: new Date() });
+  const chartData = dateRange.map(day => {
+    const d = format(day, 'yyyy-MM-dd');
+    const log = moods.find(m => m.log_date === d);
+    return { date: format(day, days <= 7 ? 'EEE' : 'MM/dd'), score: log?.mood_score || null, label: log?.mood_label };
+  });
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    const mood = MOODS.find(m => m.score === payload[0]?.value);
+    return (
+      <div className="glass-card p-2.5 text-xs border border-border/50">
+        <p className="font-semibold text-foreground">{label}</p>
+        {mood && <p className="mt-1">{mood.emoji} {mood.label} ({payload[0].value}/10)</p>}
+      </div>
+    );
   };
 
-  const toggleEmotion = (tag) => {
-    setEmotions(prev => prev.includes(tag) ? prev.filter(e => e !== tag) : [...prev, tag]);
-  };
-
-  const trendData = trendDays === 7 ? trend7 : trend30;
-  const avgScore = moods.length > 0
-    ? (moods.reduce((s, m) => s + m.mood_score, 0) / moods.length).toFixed(1)
-    : null;
-
-  const currentMood = MOODS.find(m => m.score <= score) || MOODS[MOODS.length - 1];
+  const showLogger = !todayMood || editMode;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">Mood Tracker</h1>
+        <p className="text-muted-foreground text-sm">How are you feeling today?</p>
+      </div>
 
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Mood Tracker</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {avgScore ? `Your average mood: ${avgScore}/10` : 'Start tracking your mood'}
-          </p>
-        </div>
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" /></div>
+      ) : (
+        <>
+          {/* Today's Mood Logging / Display */}
+          {showLogger ? (
+            <div className="glass-card p-6 glow-border">
+              <h2 className="font-display font-semibold text-foreground mb-5">
+                {editMode ? '✏️ Update Today\'s Mood' : 'Log Today\'s Mood'}
+              </h2>
 
-        {/* ── Log Mood Card ── */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700/50 shadow-sm p-6">
-          <h2 className="font-bold text-gray-800 dark:text-white mb-5">How are you feeling?</h2>
+              <div className="flex justify-center gap-2 md:gap-4 mb-6 flex-wrap">
+                {MOODS.map(mood => (
+                  <button
+                    key={mood.label}
+                    onClick={() => setSelectedMood(mood)}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all duration-200 hover:scale-110
+                      ${selectedMood?.label === mood.label ? 'scale-125 ring-2 bg-white/10' : 'opacity-60 hover:opacity-90'}`}
+                    style={selectedMood?.label === mood.label ? { ringColor: mood.color } : {}}
+                  >
+                    <span className="text-4xl">{mood.emoji}</span>
+                    <span className="text-xs capitalize text-muted-foreground">{mood.label}</span>
+                  </button>
+                ))}
+              </div>
 
-          {/* Big emoji display */}
-          <div className="text-center mb-5">
-            <motion.span
-              key={score}
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="text-6xl"
-            >
-              {currentMood.emoji}
-            </motion.span>
-            <p className="text-lg font-bold text-gray-700 dark:text-gray-300 mt-2">{currentMood.label}</p>
-          </div>
+              {selectedMood && (
+                <div className="space-y-4 animate-in">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">Emotions</label>
+                    <div className="flex flex-wrap gap-2">
+                      {EMOTIONS.map(e => (
+                        <button key={e} onClick={() => toggleEmotion(e)}
+                          className={`text-xs px-3 py-1.5 rounded-full transition-all ${selectedEmotions.includes(e)
+                            ? 'bg-violet-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.3)]'
+                            : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-          {/* Slider */}
-          <div className="mb-5">
-            <div className="flex justify-between text-xs text-gray-400 mb-2">
-              <span>😢 Terrible</span>
-              <span className="font-bold text-gray-700 dark:text-gray-300">{score}/10</span>
-              <span>🌟 Amazing</span>
-            </div>
-            <input
-              type="range"
-              min={1} max={10}
-              value={score}
-              onChange={e => setScore(parseInt(e.target.value))}
-              className="w-full h-3 rounded-full appearance-none cursor-pointer accent-violet-500"
-              style={{ background: `linear-gradient(to right, ${scoreColor(score)} ${score * 10}%, #e5e7eb ${score * 10}%)` }}
-            />
-          </div>
+                  <textarea
+                    className="input-field resize-none h-20 text-sm"
+                    placeholder="Add notes about your day... (optional)"
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                  />
 
-          {/* Emotion Tags */}
-          <div className="mb-4">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Emotions (optional)</p>
-            <div className="flex flex-wrap gap-2">
-              {EMOTION_TAGS.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleEmotion(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-                    emotions.includes(tag)
-                      ? 'bg-violet-600 text-white border-violet-600'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-violet-400'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <textarea
-            placeholder="What's on your mind? (optional)"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={2}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none mb-4"
-          />
-
-          <button
-            onClick={handleLog}
-            disabled={submitting}
-            className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
-          >
-            <Smile className="h-4 w-4" />
-            {submitting ? 'Logging...' : 'Log Mood'}
-          </button>
-        </div>
-
-        {/* ── Trend Charts ── */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700/50 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-violet-500" /> Mood Trend
-            </h2>
-            <div className="flex gap-2">
-              {[7, 30].map(d => (
-                <button
-                  key={d}
-                  onClick={() => setTrendDays(d)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    trendDays === d
-                      ? 'bg-violet-600 text-white'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {d}d
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {trendData.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">No mood data yet</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={trendData} margin={{ top: 5, right: 5, bottom: 0, left: -25 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156,163,175,0.15)" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10, fill: '#9ca3af' }}
-                  axisLine={false} tickLine={false}
-                  interval={trendDays === 30 ? 5 : 0}
-                />
-                <YAxis domain={[0, 10]} ticks={[0, 5, 10]} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  content={({ active, payload, label }) =>
-                    active && payload?.length && payload[0].value !== null ? (
-                      <div className="bg-gray-900 border border-white/10 rounded-xl px-3 py-2 text-xs shadow-xl">
-                        <p className="text-white/50">{label}</p>
-                        <p className="font-bold" style={{ color: scoreColor(payload[0].value) }}>
-                          {payload[0].value}/10
-                        </p>
-                      </div>
-                    ) : null
-                  }
-                />
-                <Line
-                  type="monotone" dataKey="score"
-                  stroke="#8b5cf6" strokeWidth={2.5}
-                  dot={({ cx, cy, payload }) =>
-                    payload.score !== null ? (
-                      <circle key={cx} cx={cx} cy={cy} r={4}
-                        fill={scoreColor(payload.score)} stroke="white" strokeWidth={1.5}
-                      />
-                    ) : <g key={cx} />
-                  }
-                  connectNulls={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* ── History ── */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700/50 shadow-sm p-5">
-          <h2 className="font-bold text-gray-800 dark:text-white mb-4">History</h2>
-          <div className="space-y-2 max-h-80 overflow-y-auto">
-            {moods.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No entries yet</p>
-            ) : moods.map(m => (
-              <div key={m.id} className="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                {editingId === m.id ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <input type="range" min={1} max={10} value={editScore}
-                      onChange={e => setEditScore(parseInt(e.target.value))}
-                      className="w-24 accent-violet-500"
-                    />
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300 w-8">{editScore}/10</span>
-                    <input type="text" value={editNotes}
-                      onChange={e => setEditNotes(e.target.value)}
-                      placeholder="Notes..."
-                      className="flex-1 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs text-gray-900 dark:text-white focus:outline-none"
-                    />
-                    <button onClick={() => saveEdit(m.id)} className="p-1 text-green-500 hover:text-green-400">
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                      <X className="h-4 w-4" />
+                  <div className="flex gap-3">
+                    {editMode && (
+                      <button onClick={() => { setEditMode(false); setSelectedMood(null); }} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground text-sm hover:text-foreground transition-all">
+                        Cancel
+                      </button>
+                    )}
+                    <button onClick={logMood} disabled={saving} className="flex-1 neon-button py-3 flex items-center justify-center gap-2">
+                      {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>
+                        <Heart size={16} /> {editMode ? 'Update' : 'Save'} Mood {selectedMood.emoji}
+                      </>}
                     </button>
                   </div>
-                ) : (
-                  <>
-                    <span className="text-2xl flex-shrink-0">
-                      {MOODS.find(x => x.score <= m.mood_score)?.emoji || '😐'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: scoreColor(m.mood_score) }}>
-                          {m.mood_score}/10
-                        </span>
-                        {m.emotions?.length > 0 && (
-                          <span className="text-xs text-gray-400 truncate">
-                            {m.emotions.slice(0, 3).join(', ')}
-                          </span>
-                        )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="glass-card p-5 border border-emerald-500/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-5xl">{MOODS.find(m => m.label === todayMood.mood_label)?.emoji || '😊'}</span>
+                  <div>
+                    <p className="font-semibold text-foreground capitalize">Feeling {todayMood.mood_label} today</p>
+                    <p className="text-sm text-muted-foreground">Score: {todayMood.mood_score}/10</p>
+                    {todayMood.emotions?.length > 0 && (
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {todayMood.emotions.map(e => <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">{e}</span>)}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-400">
-                          {new Date(m.log_date || m.created_at).toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                        {m.notes && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{m.notes}</p>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => startEdit(m)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-violet-500 transition-all"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                  </>
-                )}
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={startEdit}
+                  className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:border-violet-500/50 transition-all"
+                >
+                  <Edit2 size={14} /> Edit
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
+              {todayMood.notes && <p className="mt-3 text-sm text-muted-foreground italic">"{todayMood.notes}"</p>}
+            </div>
+          )}
 
-      </div>
+          {/* Stats Row */}
+          {stats && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="stat-card text-center">
+                <p className="text-3xl font-bold gradient-text">{stats.average || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Avg Score</p>
+              </div>
+              <div className="stat-card text-center">
+                <p className="text-3xl font-bold text-foreground">{stats.total}</p>
+                <p className="text-xs text-muted-foreground mt-1">Days Tracked</p>
+              </div>
+              <div className="stat-card text-center">
+                <p className="text-3xl font-bold text-foreground">
+                  {stats.average >= 7 ? '🌟' : stats.average >= 5 ? '😊' : '💙'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.average >= 7 ? 'Thriving' : stats.average >= 5 ? 'Stable' : 'Needs care'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mood Chart with 7/30 toggle */}
+          {chartData.filter(d => d.score).length > 0 && (
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+                  <TrendingUp size={18} className="text-violet-400" />
+                  Mood Trend
+                </h2>
+                <div className="flex rounded-xl border border-border overflow-hidden">
+                  {['7', '30'].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setChartRange(r)}
+                      className={`px-3 py-1.5 text-xs font-medium transition-all ${chartRange === r ? 'bg-violet-600 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+                    >
+                      {r}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                {chartRange === '7' ? (
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#666' }} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#666' }} width={20} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="score" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                ) : (
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="moodFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} />
+                    <YAxis domain={[1, 10]} tick={{ fontSize: 10, fill: '#666' }} width={20} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#moodFill)" dot={{ fill: '#8B5CF6', r: 3 }} />
+                  </AreaChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Recent entries */}
+          <div className="glass-card p-5">
+            <h2 className="font-display font-semibold text-foreground mb-4">Recent Entries</h2>
+            {moods.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No mood entries yet. Start tracking above!</p>
+            ) : (
+              <div className="space-y-3">
+                {moods.slice(0, 10).map(mood => (
+                  <div key={mood.id} className="flex items-center gap-4 p-3 rounded-xl bg-secondary/50">
+                    <span className="text-2xl">{MOODS.find(m => m.label === mood.mood_label)?.emoji || '😊'}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground capitalize">{mood.mood_label}</span>
+                        <span className="text-xs text-muted-foreground">Score: {mood.mood_score}/10</span>
+                      </div>
+                      {mood.emotions?.length > 0 && (
+                        <div className="flex gap-1 mt-1">
+                          {mood.emotions.slice(0, 4).map((e, i, arr) => (
+                            <span key={e} className="text-xs text-muted-foreground">{e}{i < Math.min(3, arr.length - 1) ? ' ·' : ''}</span>
+                          ))}
+                        </div>
+                      )}
+                      {mood.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate italic">"{mood.notes}"</p>}
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(mood.log_date), 'MMM d')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

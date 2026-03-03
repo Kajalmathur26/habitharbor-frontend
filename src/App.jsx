@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/layout/Layout';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -14,8 +15,7 @@ import HabitsPage from './pages/HabitsPage';
 import MoodPage from './pages/MoodPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
-// ADD import for Finance page
-import FinancePage from '@/pages/FinancePage';
+import FinancePage from './pages/FinancePage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -29,7 +29,7 @@ const ProtectedRoute = ({ children }) => {
       </div>
     </div>
   );
-  return user ? children : <Navigate to="/login" replace />;
+  return user ? children : <Navigate to="/landing" replace />;
 };
 
 const PublicRoute = ({ children }) => {
@@ -55,11 +55,10 @@ export default function App() {
             }}
           />
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+            <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-
-            {/* Protected routes inside Layout */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="tasks" element={<TasksPage />} />
@@ -70,7 +69,6 @@ export default function App() {
               <Route path="mood" element={<MoodPage />} />
               <Route path="ai" element={<AIAssistantPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              {/* ADD Finance page route */}
               <Route path="finance" element={<FinancePage />} />
             </Route>
           </Routes>
