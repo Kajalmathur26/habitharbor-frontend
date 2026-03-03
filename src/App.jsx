@@ -14,17 +14,18 @@ import HabitsPage from './pages/HabitsPage';
 import MoodPage from './pages/MoodPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
-import { Anchor } from 'lucide-react';
+// ADD import for Finance page
+import FinancePage from '@/pages/FinancePage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-teal-600 flex items-center justify-center animate-pulse">
-          <Anchor size={24} className="text-white" />
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center animate-pulse">
+          <span className="text-white text-xl font-bold">P</span>
         </div>
-        <p className="text-muted-foreground text-sm">Loading HabitHarbor...</p>
+        <p className="text-muted-foreground text-sm">Loading Planora...</p>
       </div>
     </div>
   );
@@ -46,11 +47,10 @@ export default function App() {
             position="top-right"
             toastOptions={{
               style: {
-                background: 'white',
-                color: 'hsl(215,28%,17%)',
-                border: '1px solid hsl(210,16%,88%)',
-                borderRadius: '10px',
-                fontSize: '14px',
+                background: 'hsl(224, 20%, 9%)',
+                color: 'hsl(210, 40%, 95%)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                borderRadius: '12px',
               },
             }}
           />
@@ -58,6 +58,8 @@ export default function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+
+            {/* Protected routes inside Layout */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="tasks" element={<TasksPage />} />
@@ -68,6 +70,8 @@ export default function App() {
               <Route path="mood" element={<MoodPage />} />
               <Route path="ai" element={<AIAssistantPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              {/* ADD Finance page route */}
+              <Route path="finance" element={<FinancePage />} />
             </Route>
           </Routes>
         </BrowserRouter>

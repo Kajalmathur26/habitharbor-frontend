@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const EVENT_COLORS = ['#0d9488', '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const EVENT_COLORS = ['#8B5CF6', '#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#EC4899'];
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -14,7 +14,7 @@ export default function CalendarPage() {
   const [view, setView] = useState('month');
   const [form, setForm] = useState({
     title: '', description: '', start_time: '', end_time: '',
-    color: '#0d9488', location: '', is_all_day: false
+    color: '#8B5CF6', location: '', is_all_day: false
   });
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function CalendarPage() {
       setEvents([...events, res.data.event]);
       toast.success('Event created!');
       setShowForm(false);
-      setForm({ title: '', description: '', start_time: '', end_time: '', color: '#0d9488', location: '', is_all_day: false });
+      setForm({ title: '', description: '', start_time: '', end_time: '', color: '#8B5CF6', location: '', is_all_day: false });
     } catch {
       toast.error('Failed to create event');
     }
@@ -82,14 +82,14 @@ export default function CalendarPage() {
           <h1 className="font-display text-2xl font-bold text-foreground">Calendar</h1>
           <p className="text-muted-foreground text-sm">{events.length} events this month</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowForm(true)} className="neon-button flex items-center gap-2">
           <Plus size={16} /> Add Event
         </button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Calendar Grid */}
-        <div className="xl:col-span-3 hh-card p-5">
+        <div className="xl:col-span-3 glass-card p-5">
           {/* Month Navigation */}
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-display text-xl font-semibold text-foreground">
@@ -99,7 +99,7 @@ export default function CalendarPage() {
               <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">
                 <ChevronLeft size={18} />
               </button>
-              <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 rounded-lg text-xs bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 transition-colors">
+              <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 rounded-lg text-xs bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition-colors">
                 Today
               </button>
               <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">
@@ -129,11 +129,11 @@ export default function CalendarPage() {
                   onClick={() => setSelectedDay(day)}
                   onDoubleClick={() => openFormForDay(day)}
                   className={`min-h-[72px] p-1.5 rounded-xl cursor-pointer transition-all group
-                    ${isSelected ? 'bg-teal-600/20 ring-1 ring-teal-500/40' : 'hover:bg-white/5'}
+                    ${isSelected ? 'bg-violet-600/20 ring-1 ring-violet-500/40' : 'hover:bg-white/5'}
                     ${!isCurrentMonth ? 'opacity-30' : ''}`}
                 >
                   <div className={`text-xs font-medium w-7 h-7 flex items-center justify-center rounded-lg mb-1
-                    ${isCurrent ? 'bg-teal-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.5)]' : 'text-foreground'}`}>
+                    ${isCurrent ? 'bg-violet-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.5)]' : 'text-foreground'}`}>
                     {format(day, 'd')}
                   </div>
                   <div className="space-y-0.5">
@@ -157,14 +157,14 @@ export default function CalendarPage() {
         </div>
 
         {/* Day Sidebar */}
-        <div className="hh-card p-5">
+        <div className="glass-card p-5">
           <h3 className="font-display font-semibold text-foreground mb-4">
             {format(selectedDay, 'MMMM d')}
           </h3>
           {selectedDayEvents.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-muted-foreground">No events</p>
-              <button onClick={() => openFormForDay(selectedDay)} className="text-xs text-teal-400 mt-2">
+              <button onClick={() => openFormForDay(selectedDay)} className="text-xs text-violet-400 mt-2">
                 + Add event
               </button>
             </div>
@@ -197,23 +197,23 @@ export default function CalendarPage() {
       {/* Event Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="hh-card w-full max-w-md p-6 glow-border animate-in">
+          <div className="glass-card w-full max-w-md p-6 glow-border animate-in">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-display text-lg font-semibold text-foreground">New Event</h2>
               <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={18} /></button>
             </div>
             <form onSubmit={handleCreateEvent} className="space-y-4">
-              <input className="hh-input" placeholder="Event title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-              <textarea className="hh-input resize-none h-16 text-sm" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-              <input className="hh-input" placeholder="Location" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+              <input className="input-field" placeholder="Event title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+              <textarea className="input-field resize-none h-16 text-sm" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+              <input className="input-field" placeholder="Location" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Start *</label>
-                  <input type="datetime-local" className="hh-input text-sm" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} />
+                  <input type="datetime-local" className="input-field text-sm" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">End</label>
-                  <input type="datetime-local" className="hh-input text-sm" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} />
+                  <input type="datetime-local" className="input-field text-sm" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} />
                 </div>
               </div>
               <div>
@@ -228,7 +228,7 @@ export default function CalendarPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground transition-all text-sm">Cancel</button>
-                <button type="submit" className="flex-1 btn-primary py-2.5">Create Event</button>
+                <button type="submit" className="flex-1 neon-button py-2.5">Create Event</button>
               </div>
             </form>
           </div>

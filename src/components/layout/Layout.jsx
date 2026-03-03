@@ -3,97 +3,107 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
-  LayoutDashboard, CheckSquare, BookOpen, Calendar, Target, Repeat,
-  Smile, Sparkles, Settings, LogOut, Menu, X, Moon, Sun, Anchor
+  LayoutDashboard, CheckSquare, BookOpen, Calendar, Target, Flame,
+  Heart, Sparkles, Settings, LogOut, Menu, X, Bell, Moon, Sun, ChevronRight,
+  DollarSign // ✅ Added import
 } from 'lucide-react';
 
+// ✅ Added Finance to navItems
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
-  { to: '/calendar', icon: Calendar, label: 'Calendar' },
   { to: '/journal', icon: BookOpen, label: 'Journal' },
-  { to: '/mood', icon: Smile, label: 'Mood' },
-  { to: '/habits', icon: Repeat, label: 'Habits' },
+  { to: '/calendar', icon: Calendar, label: 'Calendar' },
   { to: '/goals', icon: Target, label: 'Goals' },
+  { to: '/habits', icon: Flame, label: 'Habits' },
+  { to: '/mood', icon: Heart, label: 'Mood' },
+  { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
+  { to: '/finance', icon: DollarSign, label: 'Finance' }, // ✅ New Finance item
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-        <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
-          <Anchor size={18} className="text-white" />
+      <div className="flex items-center gap-3 px-4 py-6 border-b border-border/50">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)] flex-shrink-0">
+          <span className="text-white text-sm font-bold">P</span>
         </div>
-        <div>
-          <h1 className="font-bold text-base text-white leading-none">HabitHarbor</h1>
-          <p className="text-xs text-white/50 mt-0.5">Daily Growth</p>
-        </div>
+        {sidebarOpen && (
+          <div>
+            <h1 className="font-display font-bold text-lg text-foreground leading-none">Planora</h1>
+            <p className="text-xs text-muted-foreground">Your ultimate planner & journaling companion</p>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             onClick={() => setMobileSidebarOpen(false)}
             className={({ isActive }) =>
-              isActive
-                ? 'flex items-center gap-3 px-3 py-2.5 rounded-lg bg-teal-600 text-white text-sm font-semibold transition-all'
-                : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/8 text-sm font-medium transition-all'
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer group
+              ${isActive
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              }`
             }
           >
             <Icon size={18} className="flex-shrink-0" />
-            <span>{label}</span>
+            {sidebarOpen && <span className="text-sm font-medium">{label}</span>}
           </NavLink>
         ))}
       </nav>
 
       {/* Bottom section */}
-      <div className="px-3 pb-4 border-t border-white/10 pt-3 space-y-0.5">
+      <div className="px-3 py-4 border-t border-border/50 space-y-1">
         <NavLink
           to="/settings"
-          onClick={() => setMobileSidebarOpen(false)}
           className={({ isActive }) =>
-            isActive
-              ? 'flex items-center gap-3 px-3 py-2.5 rounded-lg bg-teal-600 text-white text-sm font-semibold transition-all'
-              : 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/8 text-sm font-medium transition-all'
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer
+            ${isActive ? 'bg-violet-600/20 text-violet-300' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`
           }
         >
-          <Settings size={18} />
-          <span>Settings</span>
+          <Settings size={18} className="flex-shrink-0" />
+          {sidebarOpen && <span className="text-sm font-medium">Settings</span>}
         </NavLink>
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:text-red-300 hover:bg-red-500/10 transition-all w-full text-sm font-medium"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 w-full"
         >
-          <LogOut size={18} />
-          <span>Logout</span>
+          <LogOut size={18} className="flex-shrink-0" />
+          {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
         </button>
 
         {/* User info */}
-        <div className="flex items-center gap-3 px-3 py-3 mt-1 rounded-xl bg-white/5 border border-white/10">
-          {user?.avatar_url ? (
-            <img src={user.avatar_url} alt="avatar" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-          ) : (
-            <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-bold">{user?.name?.charAt(0).toUpperCase()}</span>
+        {sidebarOpen && (
+          <div className="flex items-center gap-3 px-3 py-3 mt-2 glass-card rounded-xl">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-bold">
+                {user?.name?.charAt(0).toUpperCase()}
+              </span>
             </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-white/50 truncate">{user?.email}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -101,15 +111,25 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col flex-shrink-0 w-64 border-r border-white/5" style={{ backgroundColor: 'hsl(215,35%,14%)' }}>
+      <aside
+        className={`hidden md:flex flex-col flex-shrink-0 border-r border-border/50 transition-all duration-300 relative
+          ${sidebarOpen ? 'w-64' : 'w-16'}`}
+        style={{ background: 'hsl(224, 20%, 7%)' }}
+      >
         <SidebarContent />
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-violet-600 border border-violet-500 flex items-center justify-center cursor-pointer hover:bg-violet-500 transition-colors z-10"
+        >
+          <ChevronRight size={12} className={`text-white transition-transform ${sidebarOpen ? 'rotate-180' : ''}`} />
+        </button>
       </aside>
 
-      {/* Sidebar - Mobile */}
+      {/* Sidebar - Mobile overlay */}
       {mobileSidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileSidebarOpen(false)} />
-          <aside className="relative w-64 flex flex-col z-10 border-r border-white/5" style={{ backgroundColor: 'hsl(215,35%,14%)' }}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
+          <aside className="relative w-64 flex flex-col border-r border-border/50 z-10" style={{ background: 'hsl(224, 20%, 7%)' }}>
             <SidebarContent />
           </aside>
         </div>
@@ -118,34 +138,35 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between px-4 md:px-6 h-14 border-b border-border flex-shrink-0 bg-card">
+        <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border/50 flex-shrink-0" style={{ background: 'hsl(224, 20%, 7%)' }}>
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-muted text-muted-foreground"
+            className="md:hidden p-2 rounded-lg hover:bg-white/5 text-muted-foreground"
             onClick={() => setMobileSidebarOpen(true)}
           >
             <Menu size={20} />
           </button>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="avatar" className="w-8 h-8 rounded-lg object-cover cursor-pointer" />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center cursor-pointer">
-                <span className="text-white text-xs font-bold">{user?.name?.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
+            <button className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">
+              <Bell size={18} />
+            </button>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center cursor-pointer">
+              <span className="text-white text-xs font-bold">
+                {user?.name?.charAt(0).toUpperCase()}
+              </span>
+            </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-background">
-          <div className="page-transition max-w-7xl mx-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="page-transition max-w-7xl mx-auto">
             <Outlet />
           </div>
         </main>

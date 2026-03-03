@@ -1,165 +1,233 @@
 import { useState, useEffect } from 'react';
 import { habitService } from '../services';
-import { Plus, X, Flame } from 'lucide-react';
+import { Plus, Flame, Trash2, X } from 'lucide-react';
+import { format, eachDayOfInterval, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
-import { format, startOfWeek, addDays } from 'date-fns';
 
-const FREQUENCIES = ['daily', 'weekly'];
-const HABIT_EMOJIS = ['🧘', '💪', '📚', '🏃', '💧', '🎯', '✍️', '🎨', '🍎', '😴'];
-
-const getDayLabels = () => {
-  const start = startOfWeek(new Date(), { weekStartsOn: 1 });
-  return Array.from({ length: 7 }, (_, i) => format(addDays(start, i), 'EEE'));
-};
+const ICONS = ['⭐', '💪', '🏃', '📚', '💧', '🧘', '🍎', '💤', '🎯', '🎨', '🎵', '💊'];
+const COLORS = ['#8B5CF6', '#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6'];
 
 export default function HabitsPage() {
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', frequency: 'daily', icon: '🎯' });
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    icon: '⭐',
+    color: '#8B5CF6',
+    frequency: 'daily',
+    target_count: 1,
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  const last7Days = eachDayOfInterval({ start: subDays(new Date(), 6), end: new Date() });
 
   useEffect(() => { loadHabits(); }, []);
 
   const loadHabits = async () => {
     try {
       const res = await habitService.getAll();
-      setHabits(res.data.habits || []);
+      setHabits(res.data.habits);
     } catch { toast.error('Failed to load habits'); }
     finally { setLoading(false); }
   };
 
-  const createHabit = async () => {
-    if (!form.name.trim()) return toast.error('Name required');
+  const createHabit = async (e) => {
+    e.preventDefault();
+    if (!form.name) return toast.error('Name required');
     try {
       const res = await habitService.create(form);
-      setHabits([res.data.habit, ...habits]);
-      setForm({ name: '', description: '', frequency: 'daily', icon: '🎯' });
+      setHabits([...habits, res.data.habit]);
+      toast.success('Habit created! 🔥');
       setShowForm(false);
-      toast.success('Habit created!');
+      setForm({ name: '', description: '', icon: '⭐', color: '#8B5CF6', frequency: 'daily', target_count: 1 });
     } catch { toast.error('Failed to create habit'); }
   };
 
-  const logHabit = async (habit) => {
+  const deleteHabit = async (id) => {
+    if (!confirm('Delete habit?')) return;
     try {
-      const today = new Date().toISOString().split('T')[0];
-      await habitService.log(habit.id, { log_date: today, completed: true });
-      await loadHabits();
-      toast.success('Habit logged! 🔥');
-    } catch { toast.error('Failed to log habit'); }
+      await habitService.delete(id);
+      setHabits(habits.filter(h => h.id !== id));
+      toast.success('Habit deleted');
+    } catch { toast.error('Failed to delete'); }
   };
 
-  const isLoggedToday = (habit) => {
-    if (!habit.last_logged_at) return false;
-    const today = new Date().toISOString().split('T')[0];
-    const lastLog = habit.last_logged_at.split('T')[0];
-    return lastLog === today;
+  const isLoggedOn = (habit, date) => {
+    const d = format(date, 'yyyy-MM-dd');
+    return habit.habit_logs?.some(l => l.log_date === d && l.completed);
   };
 
-  const dayLabels = getDayLabels();
-  const todayCompleted = habits.filter(h => h.is_active && isLoggedToday(h)).length;
-  const activeHabits = habits.filter(h => h.is_active !== false);
-  const progressPct = activeHabits.length ? Math.round((todayCompleted / activeHabits.length) * 100) : 0;
+  const completedToday = habits.filter(h => h.habit_logs?.some(l => l.log_date === today && l.completed)).length;
+
+  // ── TOGGLE HABIT ──
+  const toggleHabit = async (habit) => {
+    // Optimistic update
+    setHabits(prev => prev.map(h => {
+      if (h.id !== habit.id) return h;
+
+      const todayLog = h.habit_logs?.find(l => l.log_date === today);
+      if (todayLog) {
+        todayLog.completed = !todayLog.completed;
+        return { ...h };
+      } else {
+        const newLog = { log_date: today, completed: true };
+        return { ...h, habit_logs: [...(h.habit_logs || []), newLog] };
+      }
+    }));
+
+    try {
+      await habitService.log(habit.id);
+      // Sync with backend
+      const res = await habitService.getAll();
+      setHabits(res.data.habits || []);
+    } catch {
+      toast.error('Failed to update habit');
+      const res = await habitService.getAll();
+      setHabits(res.data.habits || []);
+    }
+  };
 
   return (
-    <div className="space-y-5 page-transition">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Habits</h1>
-          <p className="text-sm text-muted-foreground">{todayCompleted}/{activeHabits.length} completed today</p>
+          <h1 className="font-display text-2xl font-bold text-foreground">Habits</h1>
+          <p className="text-muted-foreground text-sm">{completedToday}/{habits.length} done today</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary text-sm">
+        <button onClick={() => setShowForm(true)} className="neon-button flex items-center gap-2">
           <Plus size={16} /> New Habit
         </button>
       </div>
 
-      {/* Today's Progress */}
-      <div className="hh-card p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-foreground">Today's Progress</span>
-          <span className="text-sm font-bold text-teal-600">{progressPct}%</span>
-        </div>
-        <div className="w-full h-3 bg-border rounded-full overflow-hidden">
-          <div className="h-full bg-teal-500 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
-        </div>
-      </div>
-
-      {/* Add Form */}
-      {showForm && (
-        <div className="hh-card p-5 border-2 border-teal-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-foreground">New Habit</h2>
-            <button onClick={() => setShowForm(false)} className="text-muted-foreground"><X size={18} /></button>
+      {/* Today's Progress Bar */}
+      {habits.length > 0 && (
+        <div className="glass-card p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-foreground">Today's Progress</span>
+            <span className="text-sm text-violet-400">{habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%</span>
           </div>
-          <div className="space-y-3">
-            <div className="flex gap-2 flex-wrap mb-1">
-              {HABIT_EMOJIS.map(e => (
-                <button key={e} onClick={() => setForm({ ...form, icon: e })}
-                  className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-colors ${form.icon === e ? 'bg-teal-100 ring-2 ring-teal-500' : 'bg-muted hover:bg-muted/80'}`}>
-                  {e}
-                </button>
-              ))}
-            </div>
-            <input className="hh-input" placeholder="Habit name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <input className="hh-input" placeholder="Description (optional)" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-            <select className="hh-input" value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })}>
-              {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-            <div className="flex gap-2">
-              <button onClick={createHabit} className="btn-primary text-sm">Create Habit</button>
-              <button onClick={() => setShowForm(false)} className="btn-secondary text-sm">Cancel</button>
-            </div>
+          <div className="h-3 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(139,92,246,0.5)]"
+              style={{ width: `${habits.length > 0 ? (completedToday / habits.length) * 100 : 0}%` }}
+            />
           </div>
         </div>
       )}
 
-      {/* Habits Grid */}
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="w-6 h-6 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
-        </div>
-      ) : activeHabits.length === 0 ? (
-        <div className="hh-card p-12 text-center">
-          <p className="text-muted-foreground">No habits yet. Create one above!</p>
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" /></div>
+      ) : habits.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <Flame size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="text-foreground font-medium">No habits yet</p>
+          <button onClick={() => setShowForm(true)} className="neon-button mt-4 inline-flex items-center gap-2"><Plus size={16} /> Create Habit</button>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {activeHabits.map(habit => {
-            const logged = isLoggedToday(habit);
+        <div className="space-y-3">
+          {habits.map(habit => {
+            const doneToday = isLoggedOn(habit, new Date());
             return (
-              <div key={habit.id} className="hh-card p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{habit.icon || '🎯'}</span>
-                    <div>
-                      <p className={`font-semibold text-foreground ${logged ? 'line-through text-muted-foreground' : ''}`}>{habit.name}</p>
-                      <div className="flex items-center gap-1 text-xs text-orange-500 font-medium mt-0.5">
-                        <Flame size={12} />
-                        <span>{habit.current_streak || 0} day streak</span>
-                      </div>
+              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-75' : ''}`}>
+                <div className="flex items-center gap-4">
+                  {/* Complete / Toggle button */}
+                  <button
+                    onClick={() => toggleHabit(habit)}
+                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
+                    style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
+                  >
+                    {doneToday ? '✅' : habit.icon}
+                  </button>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className={`font-semibold text-foreground ${doneToday ? 'line-through opacity-60' : ''}`}>{habit.name}</h3>
+                      {doneToday && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Done!</span>}
+                    </div>
+                    {habit.description && <p className="text-xs text-muted-foreground truncate">{habit.description}</p>}
+
+                    {/* 7-day grid */}
+                    <div className="flex gap-1 mt-2">
+                      {last7Days.map(day => (
+                        <div
+                          key={day.toISOString()}
+                          className="w-5 h-5 rounded-md flex items-center justify-center"
+                          style={{
+                            background: isLoggedOn(habit, day) ? habit.color + '60' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${isLoggedOn(habit, day) ? habit.color + '80' : 'rgba(255,255,255,0.1)'}`
+                          }}
+                          title={format(day, 'EEE, MMM d')}
+                        >
+                          {isLoggedOn(habit, day) && <div className="w-2 h-2 rounded-full" style={{ background: habit.color }} />}
+                        </div>
+                      ))}
                     </div>
                   </div>
+
+                  {/* Streak */}
+                  <div className="text-center flex-shrink-0">
+                    <p className="text-xl font-bold" style={{ color: habit.color }}>🔥 {habit.current_streak}</p>
+                    <p className="text-xs text-muted-foreground">streak</p>
+                  </div>
+
+                  {/* Delete */}
                   <button
-                    onClick={() => !logged && logHabit(habit)}
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                      logged ? 'bg-teal-500 text-white' : 'bg-muted border border-border hover:border-teal-400 text-muted-foreground'
-                    }`}
+                    onClick={() => deleteHabit(habit.id)}
+                    className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all flex-shrink-0"
                   >
-                    {logged ? '✓' : ''}
+                    <Trash2 size={15} />
                   </button>
-                </div>
-                {/* Week dots */}
-                <div className="flex gap-1 mt-2">
-                  {dayLabels.map((day, i) => (
-                    <div key={i} className="flex-1 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">{day}</p>
-                      <div className={`w-full aspect-square max-w-[28px] mx-auto rounded-full ${i < 6 || logged ? 'bg-teal-500' : 'bg-border'}`} />
-                    </div>
-                  ))}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Create Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 glow-border animate-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-lg font-semibold text-foreground">New Habit</h2>
+              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={18} /></button>
+            </div>
+            <form onSubmit={createHabit} className="space-y-4">
+              <input className="input-field" placeholder="Habit name *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <input className="input-field text-sm" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">Choose Icon</label>
+                <div className="flex flex-wrap gap-2">
+                  {ICONS.map(icon => (
+                    <button type="button" key={icon} onClick={() => setForm({ ...form, icon })}
+                      className={`text-2xl p-1.5 rounded-lg transition-all ${form.icon === icon ? 'bg-violet-600/30 ring-1 ring-violet-500' : 'hover:bg-white/5'}`}>
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">Color</label>
+                <div className="flex gap-2">
+                  {COLORS.map(c => (
+                    <button type="button" key={c} onClick={() => setForm({ ...form, color: c })}
+                      className={`w-7 h-7 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-white scale-110' : 'hover:scale-105'}`}
+                      style={{ background: c }} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground text-sm">Cancel</button>
+                <button type="submit" className="flex-1 neon-button py-2.5">Create</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
