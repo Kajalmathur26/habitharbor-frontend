@@ -30,7 +30,7 @@ export default function TasksPage() {
       if (filter.status) params.status = filter.status;
       if (filter.priority) params.priority = filter.priority;
       const res = await taskService.getAll(params);
-      setTasks(res.data.tasks);
+      setTasks(res.data?.tasks || []);
     } catch {
       toast.error('Failed to load tasks');
     } finally {
@@ -126,9 +126,9 @@ export default function TasksPage() {
   };
 
   const groupedTasks = {
-    pending: tasks.filter(t => t.status === 'pending'),
-    in_progress: tasks.filter(t => t.status === 'in_progress'),
-    completed: tasks.filter(t => t.status === 'completed'),
+  pending: (tasks || []).filter(t => t.status === 'pending'),
+  in_progress: (tasks || []).filter(t => t.status === 'in_progress'),
+  completed: (tasks || []).filter(t => t.status === 'completed'),
   };
 
   return (
@@ -137,7 +137,7 @@ export default function TasksPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Tasks</h1>
-          <p className="text-muted-foreground text-sm">{tasks.filter(t => t.status === 'pending').length} pending · {tasks.filter(t => t.status === 'completed').length} done</p>
+          <p className="text-muted-foreground text-sm">{(tasks || []).filter(t => t.status === 'pending').length} pending · {(tasks || []).filter(t => t.status === 'completed').length} done</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
           <button onClick={loadAiSuggestions} disabled={loadingAi} className="neon-button flex items-center gap-2 whitespace-nowrap disabled:opacity-50">
