@@ -1,95 +1,92 @@
 import { useState, useEffect } from 'react';
-import { dashboardService, taskService, habitService, moodService } from '../services';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { dashboardService, aiService } from '../services';
+import { format } from 'date-fns';
 import {
-  CheckSquare, Heart, Flame, Target, Sparkles, Plus,
-  Calendar, BookOpen, TrendingUp, List, Star
+  CheckSquare, Target, Flame, Heart, BookOpen, Calendar,
+  TrendingUp, Sparkles, ArrowRight, Clock, AlertCircle, RefreshCw,
+  BarChart2, StickyNote, Save, Plus, X
 } from 'lucide-react';
-import { format, subDays, eachDayOfInterval } from 'date-fns';
-import {
-  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
-} from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { useNotifications } from '../hooks/useNotifications';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  useNotifications(user);
   const [data, setData] = useState(null);
+  const [weeklyReport, setWeeklyReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [note, setNote] = useState('');
-  const [notes, setNotes] = useState(() => JSON.parse(localStorage.getItem('planora_quicknotes') || '[]'));
-  const [noteInput, setNoteInput] = useState('');
-  const today = new Date();
-  const dayOfWeek = format(today, 'EEEE');
-  const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [aiPlan, setAiPlan] = useState(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [notes, setNotes] = useState(() => localStorage.getItem('planora_sticky_notes') || '');
 
-  useEffect(() => { loadDashboard(); }, []);
-  useEffect(() => { localStorage.setItem('planora_quicknotes', JSON.stringify(notes)); }, [notes]);
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
   const loadDashboard = async () => {
     try {
-      const res = await dashboardService.getData();
+      const [res, weeklyRes] = await Promise.all([
+        dashboardService.getData(),
+        dashboardService.getWeeklyReport()
+      ]);
       setData(res.data);
-    } catch { toast.error('Failed to load dashboard'); }
-    finally { setLoading(false); }
+      setWeeklyReport(weeklyRes.data);
+    } catch (err) {
+      toast.error('Failed to load dashboard');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addNote = () => {
-    if (!noteInput.trim()) return;
-    const newNote = { id: Date.now(), text: noteInput.trim(), date: format(today, 'MMM d, h:mm a') };
-    setNotes(n => [newNote, ...n]);
-    setNoteInput('');
-    toast.success('Note saved!');
+  const saveNotes = () => {
+    localStorage.setItem('planora_sticky_notes', notes);
+    toast.success('Notes saved');
   };
 
-  const deleteNote = (id) => setNotes(n => n.filter(note => note.id !== id));
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center animate-pulse">
-            <span className="text-white text-xl font-bold">P</span>
-          </div>
-          <p className="text-muted-foreground text-sm">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const tasks = data?.tasks || {};
-  const habits = data?.habits || {};
-  const mood = data?.mood || {};
-  const goals = data?.goals || {};
-
-  // Build chart data
-  const last7 = eachDayOfInterval({ start: subDays(today, 6), end: today });
-  const weeklyData = last7.map(d => ({
-    day: format(d, 'EEE'),
-    tasks: Math.floor(Math.random() * 5),  // Replace with real data if available
-    habits: Math.floor(Math.random() * 4),
-  }));
-
-  const taskDistribution = [
-    { name: 'Pending', value: tasks.pending || 0, color: '#F59E0B' },
-    { name: 'In Progress', value: tasks.in_progress || 0, color: '#3B82F6' },
-    { name: 'Completed', value: tasks.completed || 0, color: '#10B981' },
-  ].filter(d => d.value > 0);
-
-  const moodData = (data?.recentMoods || []).slice(0, 7).reverse().map(m => ({
-    day: format(new Date(m.log_date), 'EEE'),
-    score: m.mood_score
-  }));
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="glass-card p-2.5 text-xs border border-border/50">
-        <p className="font-semibold text-foreground">{label}</p>
-        {payload.map(p => <p key={p.name} style={{ color: p.color || p.fill }}>{p.name}: {p.value}</p>)}
-      </div>
-    );
+  const getAIAnalysis = async () => {
+    setLoadingAI(true);
+    try {
+      const res = await aiService.analyzeProductivity();
+      setAiAnalysis(res.data.analysis);
+    } catch (err) {
+      toast.error('AI analysis unavailable');
+    } finally {
+      setLoadingAI(false);
+    }
   };
+
+  const getAIPlan = async () => {
+    setLoadingPlan(true);
+    try {
+      const res = await aiService.planMyDay();
+      setAiPlan(res.data.schedule);
+      toast.success('Daily plan ready! 📅');
+    } catch { toast.error('Failed to generate plan'); }
+    finally { setLoadingPlan(false); }
+  };
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const moodEmojis = { great: '😄', good: '🙂', okay: '😐', bad: '😕', terrible: '😢' };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+    </div>
+  );
+
+  const { taskStats, todayEvents, moodTrend, habits, goals, recentJournals } = data || {};
+  const completionRate = taskStats?.total ? Math.round((taskStats.completed / taskStats.total) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -97,218 +94,342 @@ export default function DashboardPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-            {greeting}, {user?.name?.split(' ')[0]} 👋
+            {greeting()}, <span className="gradient-text">{user?.name?.split(' ')[0]}</span> ✨
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {dayOfWeek}, {format(today, 'MMMM d, yyyy')} — Let's make it count.
+          <p className="text-muted-foreground mt-1">
+            {format(new Date(), 'EEEE, MMMM d, yyyy')}
           </p>
         </div>
-        {user?.avatar && (
-          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-border/50">
-            <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
-          </div>
-        )}
+        <button
+          onClick={loadDashboard}
+          className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <RefreshCw size={18} />
+        </button>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { icon: CheckSquare, label: 'Tasks Done', value: tasks.completed || 0, sub: `${tasks.pending || 0} pending`, color: 'emerald', emoji: '✅' },
-          { icon: Flame, label: 'Active Habits', value: habits.active || 0, sub: `${habits.completedToday || 0} done today`, color: 'orange', emoji: '🔥' },
-          { icon: Target, label: 'Goals', value: goals.active || 0, sub: `${goals.completed || 0} completed`, color: 'violet', emoji: '🎯' },
-          { icon: Heart, label: 'Mood Today', value: mood.today?.mood_score ? `${mood.today.mood_score}/10` : '—', sub: mood.today?.mood_label || 'Not logged', color: 'rose', emoji: '💜' },
-        ].map(({ icon: Icon, label, value, sub, color, emoji }) => (
-          <div key={label} className="stat-card group hover:scale-[1.02] transition-all">
-            <div className={`inline-flex p-2 rounded-xl bg-${color}-500/15 mb-3 group-hover:bg-${color}-500/25 transition-colors`}>
+          { icon: CheckSquare, label: 'Total Tasks', value: taskStats?.total || 0, color: 'violet', link: '/tasks' },
+          { icon: CheckSquare, label: 'Completed', value: taskStats?.completed || 0, color: 'emerald', link: '/tasks' },
+          { icon: AlertCircle, label: 'Overdue', value: taskStats?.overdue || 0, color: 'rose', link: '/tasks' },
+          { icon: Target, label: 'Active Goals', value: goals?.filter(g => g.status === 'active').length || 0, color: 'amber', link: '/goals' },
+        ].map(({ icon: Icon, label, value, color, link }) => (
+          <Link key={label} to={link} className="stat-card cursor-pointer">
+            <div className={`inline-flex p-2 rounded-lg bg-${color}-500/15 mb-3`}>
               <Icon size={18} className={`text-${color}-400`} />
             </div>
-            <p className="text-2xl font-bold text-foreground">{emoji} {value}</p>
-            <p className="text-sm font-medium text-foreground mt-0.5">{label}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
-          </div>
+            <p className="text-2xl font-bold text-foreground">{value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+          </Link>
         ))}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Weekly Activity */}
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Mood Chart */}
         <div className="lg:col-span-2 glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-violet-400" />
-            Weekly Activity
-          </h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={weeklyData} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#666' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#666' }} width={25} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Bar dataKey="tasks" name="Tasks" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="habits" name="Habits" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Task Distribution Pie */}
-        <div className="glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <List size={18} className="text-violet-400" />
-            Task Status
-          </h2>
-          {taskDistribution.length === 0 ? (
-            <div className="flex items-center justify-center h-36 text-sm text-muted-foreground">No tasks yet</div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={120}>
-                <PieChart>
-                  <Pie data={taskDistribution} cx="50%" cy="50%" outerRadius={50} innerRadius={28} dataKey="value" paddingAngle={3}>
-                    {taskDistribution.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v, n) => [v, n]} contentStyle={{ background: '#1a1b2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-1.5 mt-2">
-                {taskDistribution.map(d => (
-                  <div key={d.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
-                      <span className="text-xs text-muted-foreground">{d.name}</span>
-                    </div>
-                    <span className="text-xs font-medium text-foreground">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Mood Trend */}
-      {moodData.length > 0 && (
-        <div className="glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Heart size={18} className="text-rose-400" />
-            7-Day Mood Trend
-          </h2>
-          <ResponsiveContainer width="100%" height={120}>
-            <AreaChart data={moodData}>
-              <defs>
-                <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F43F5E" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#F43F5E" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#666' }} />
-              <YAxis domain={[1, 10]} tick={{ fontSize: 11, fill: '#666' }} width={20} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="score" stroke="#F43F5E" strokeWidth={2} fill="url(#moodGrad)" dot={{ fill: '#F43F5E', r: 3 }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Bottom 2-col: Quick Notes + Plan & Schedules */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Quick Notes */}
-        <div className="glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <BookOpen size={18} className="text-amber-400" />
-            Quick Notes
-          </h2>
-          <div className="flex gap-2 mb-4">
-            <input
-              className="input-field flex-1 text-sm py-2"
-              placeholder="Capture a thought..."
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addNote()}
-            />
-            <button onClick={addNote} className="neon-button px-3 py-2"><Plus size={15} /></button>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp size={18} className="text-violet-400" />
+              Mood Trend
+            </h2>
+            <Link to="/mood" className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
+              View all <ArrowRight size={12} />
+            </Link>
           </div>
-          {notes.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-6">Notes you jot here stay on this device</p>
+          {moodTrend && moodTrend.length > 0 ? (
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={moodTrend}>
+                <defs>
+                  <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="log_date" tick={{ fontSize: 11, fill: '#666' }} tickFormatter={d => format(new Date(d), 'MM/dd')} />
+                <YAxis domain={[1, 10]} tick={{ fontSize: 11, fill: '#666' }} width={20} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }}
+                  labelFormatter={d => format(new Date(d), 'MMM d')}
+                />
+                <Area type="monotone" dataKey="mood_score" stroke="#8B5CF6" strokeWidth={2} fill="url(#moodGrad)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {notes.map(n => (
-                <div key={n.id} className="flex items-start gap-2 p-2.5 rounded-xl bg-secondary/50 group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground leading-snug">{n.text}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{n.date}</p>
-                  </div>
-                  <button onClick={() => deleteNote(n.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all flex-shrink-0 mt-0.5">
-                    ×
-                  </button>
-                </div>
-              ))}
+            <div className="h-40 flex items-center justify-center">
+              <div className="text-center">
+                <Heart size={32} className="text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No mood data yet</p>
+                <Link to="/mood" className="text-xs text-violet-400 mt-1 block">Start tracking →</Link>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Plan & Schedules */}
+        {/* Today's Events */}
         <div className="glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Calendar size={18} className="text-indigo-400" />
-            Plan & Schedules
-          </h2>
-          <div className="space-y-3">
-            {/* Today's events from dashboard data */}
-            {(data?.todayEvents || []).length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar size={28} className="text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">No events scheduled today</p>
-                <a href="/calendar" className="text-xs text-violet-400 hover:text-violet-300 mt-1 inline-block transition-colors">→ Open Calendar</a>
-              </div>
-            ) : (
-              (data?.todayEvents || []).slice(0, 4).map(ev => (
-                <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ev.color || '#8B5CF6' }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{ev.title}</p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(ev.start_time), 'h:mm a')}</p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <Calendar size={18} className="text-indigo-400" />
+              Today
+            </h2>
+            <Link to="/calendar" className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
+              View <ArrowRight size={12} />
+            </Link>
+          </div>
+          {todayEvents && todayEvents.length > 0 ? (
+            <div className="space-y-3">
+              {todayEvents.slice(0, 4).map(event => (
+                <div key={event.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
+                  <div className="w-2 h-full min-h-8 rounded-full flex-shrink-0" style={{ background: event.color }} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock size={10} />
+                      {format(new Date(event.start_time), 'h:mm a')}
+                    </p>
                   </div>
                 </div>
-              ))
-            )}
-
-            {/* Upcoming goals */}
-            {(data?.upcomingGoals || []).length > 0 && (
-              <>
-                <div className="border-t border-border/30 pt-3 mt-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Goal Deadlines</p>
-                  {(data?.upcomingGoals || []).slice(0, 2).map(g => (
-                    <div key={g.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-secondary/50 transition-all">
-                      <Target size={14} className="text-amber-400 flex-shrink-0" />
-                      <p className="text-xs text-foreground flex-1 truncate">{g.title}</p>
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        {g.target_date ? format(new Date(g.target_date), 'MMM d') : 'No date'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center">
+              <div className="text-center">
+                <Calendar size={28} className="text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Free day! 🎉</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Recent Activity */}
-      {data?.recentActivity?.length > 0 && (
+      {/* Habits + Goals row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Habits Today */}
         <div className="glass-card p-5">
-          <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Star size={18} className="text-amber-400" />
-            Recent Activity
-          </h2>
-          <div className="space-y-2">
-            {data.recentActivity.slice(0, 5).map((activity, i) => (
-              <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50">
-                <span className="text-base">{activity.icon || '📌'}</span>
-                <div className="flex-1">
-                  <p className="text-sm text-foreground">{activity.text}</p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <Flame size={18} className="text-orange-400" />
+              Today's Habits
+            </h2>
+            <Link to="/habits" className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
+              Manage <ArrowRight size={12} />
+            </Link>
+          </div>
+          {habits && habits.length > 0 ? (
+            <div className="space-y-2">
+              {habits.slice(0, 5).map(habit => (
+                <div key={habit.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0 ${habit.completed_today ? 'opacity-100' : 'opacity-50'}`}
+                    style={{ background: habit.completed_today ? habit.color + '30' : 'transparent', border: `1px solid ${habit.color}40` }}>
+                    {habit.completed_today ? '✅' : habit.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${habit.completed_today ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      {habit.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">🔥 {habit.current_streak} day streak</p>
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</span>
+              ))}
+            </div>
+          ) : (
+            <div className="h-24 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">No habits yet</p>
+                <Link to="/habits" className="text-xs text-violet-400 mt-1 block">Create habits →</Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Goals Progress */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <Target size={18} className="text-amber-400" />
+              Goals Progress
+            </h2>
+            <Link to="/goals" className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
+              All goals <ArrowRight size={12} />
+            </Link>
+          </div>
+          {goals && goals.filter(g => g.status === 'active').length > 0 ? (
+            <div className="space-y-4">
+              {goals.filter(g => g.status === 'active').slice(0, 4).map(goal => {
+                const pct = Math.min(Math.round((goal.current_value / goal.target_value) * 100), 100);
+                return (
+                  <div key={goal.id}>
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-sm font-medium text-foreground truncate">{goal.title}</p>
+                      <span className="text-xs text-muted-foreground ml-2">{pct}%</span>
+                    </div>
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="h-24 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">No active goals</p>
+                <Link to="/goals" className="text-xs text-violet-400 mt-1 block">Set goals →</Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Insight Panel & Plan */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card p-5 glow-border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <Sparkles size={18} className="text-violet-400" />
+              AI Productivity Insights
+            </h2>
+            <button
+              onClick={getAIAnalysis} disabled={loadingAI}
+              className="text-xs neon-button py-1.5 px-3 disabled:opacity-50"
+            >
+              {loadingAI ? <div className="w-4 h-4 border border-white/30 border-t-white rounded-full animate-spin" /> : 'Analyze'}
+            </button>
+          </div>
+
+          {aiAnalysis ? (
+            <div className="prose prose-invert max-w-none">
+              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{aiAnalysis}</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-violet-600/10 border border-violet-500/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center flex-shrink-0 animate-[float_3s_ease-in-out_infinite]">
+                <Sparkles size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Get personalized insights</p>
+                <p className="text-xs text-muted-foreground">Click Analyze to get AI-powered productivity analysis based on your data.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card p-5 border border-indigo-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <Calendar size={18} className="text-indigo-400" />
+              AI Daily Plan
+            </h2>
+            {aiPlan ? (
+              <button onClick={() => setAiPlan(null)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={14} /></button>
+            ) : (
+              <button
+                onClick={getAIPlan} disabled={loadingPlan}
+                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 px-3 rounded-lg disabled:opacity-50 transition-colors shadow-[0_0_15px_rgba(79,70,229,0.3)]"
+              >
+                {loadingPlan ? 'Planning...' : 'Generate Plan'}
+              </button>
+            )}
+          </div>
+
+          {aiPlan ? (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+              {aiPlan.map((block, i) => (
+                <div key={i} className="flex gap-3 items-start border-l-2 border-indigo-500/30 pl-3 py-1">
+                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap pt-0.5">{block.time}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                      {block.emoji} {block.activity}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 capitalize">{block.category} • {block.duration} min</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[200px] text-center border border-dashed border-border/50 rounded-xl">
+              <Calendar size={32} className="text-muted-foreground mb-3" />
+              <p className="text-sm text-foreground font-medium">No plan generated</p>
+              <p className="text-xs text-muted-foreground mt-1 px-4">Let Gemini intelligently schedule your tasks, habits, and goals for today.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Weekly Report & Sticky Notes */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Weekly Chart */}
+        <div className="lg:col-span-2 glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <BarChart2 size={18} className="text-emerald-400" />
+              Weekly Task Report
+            </h2>
+          </div>
+          {weeklyReport && weeklyReport.data.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={weeklyReport.data}>
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#666' }} tickFormatter={d => format(new Date(d), 'EEE')} />
+                <YAxis tick={{ fontSize: 11, fill: '#666' }} width={20} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', fontSize: '12px' }}
+                />
+                <Bar dataKey="completed" fill="#10B981" radius={[4, 4, 0, 0]} name="Completed Tasks" />
+                <Bar dataKey="added" fill="#8B5CF6" radius={[4, 4, 0, 0]} name="Added Tasks" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-40 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">Not enough data for weekly report</p>
+            </div>
+          )}
+        </div>
+
+        {/* Sticky Notes */}
+        <div className="glass-card p-5 border border-amber-500/20 bg-amber-500/5">
+          <div className="flex items-center justify-between mb-3 border-b border-border/50 pb-3">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <StickyNote size={18} className="text-amber-400" />
+              Scratchpad
+            </h2>
+            <button onClick={saveNotes} className="text-xs text-muted-foreground hover:text-amber-400 transition-colors p-1" title="Save">
+              <Save size={14} />
+            </button>
+          </div>
+          <textarea
+            className="w-full h-[200px] bg-transparent border-none resize-none focus:outline-none focus:ring-0 text-sm placeholder:text-muted-foreground/50 text-foreground"
+            placeholder="Jot down quick thoughts here..."
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            onBlur={saveNotes}
+          />
+        </div>
+      </div>
+
+      {/* Recent Journal */}
+      {recentJournals && recentJournals.length > 0 && (
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+              <BookOpen size={18} className="text-rose-400" />
+              Recent Journal Entries
+            </h2>
+            <Link to="/journal" className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1">
+              View all <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {recentJournals.map(entry => (
+              <div key={entry.id} className="p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer">
+                <p className="text-sm font-medium text-foreground truncate">{entry.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.entry_date), 'MMM d, yyyy')}</p>
+                {entry.mood && <p className="text-lg mt-1">{moodEmojis[entry.mood] || '📝'}</p>}
               </div>
             ))}
           </div>

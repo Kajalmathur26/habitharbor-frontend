@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { moodService } from '../services';
-import { Heart, TrendingUp, Edit2 } from 'lucide-react';
+import { moodService, aiService } from '../services';
+import { Heart, TrendingUp, Edit3, X, Check, Sparkles } from 'lucide-react';
 import { format, subDays, eachDayOfInterval } from 'date-fns';
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
-} from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from 'recharts';
 import toast from 'react-hot-toast';
 
 const MOODS = [
@@ -26,49 +24,56 @@ export default function MoodPage() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editMode, setEditMode] = useState(false); // editing today's mood
-  const [chartRange, setChartRange] = useState('30'); // '7' or '30'
+  const [editEntry, setEditEntry] = useState(null);
+  const [editMood, setEditMood] = useState(null);
+  const [editEmotions, setEditEmotions] = useState([]);
+  const [editNotes, setEditNotes] = useState('');
+  const [aiInsight, setAiInsight] = useState(null);
+  const [loadingAi, setLoadingAi] = useState(false);
   const today = new Date().toISOString().split('T')[0];
   const todayMood = moods.find(m => m.log_date === today);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const loadData = async () => {
     try {
-      const [moodsRes, statsRes] = await Promise.all([moodService.getAll(), moodService.getStats()]);
+      const [moodsRes, statsRes] = await Promise.all([
+        moodService.getAll(),
+        moodService.getStats()
+      ]);
       setMoods(moodsRes.data.moods);
       setStats(statsRes.data);
     } catch { toast.error('Failed to load mood data'); }
     finally { setLoading(false); }
   };
 
-  const startEdit = () => {
-    if (!todayMood) return;
-    setSelectedMood(MOODS.find(m => m.label === todayMood.mood_label) || null);
-    setSelectedEmotions(todayMood.emotions || []);
-    setNotes(todayMood.notes || '');
-    setEditMode(true);
+  const loadAiInsight = async () => {
+    setLoadingAi(true);
+    try {
+      const res = await aiService.analyzeProductivity();
+      setAiInsight(res.data.analysis || null);
+    } catch { toast.error('Failed to generate mood insight'); }
+    finally { setLoadingAi(false); }
   };
 
   const logMood = async () => {
     if (!selectedMood) return toast.error('Please select a mood');
     setSaving(true);
     try {
-      if (editMode && todayMood) {
-        await moodService.update(todayMood.id, {
-          mood_score: selectedMood.score,
-          mood_label: selectedMood.label,
-          emotions: selectedEmotions,
-          notes
-        });
-        toast.success(`Mood updated! ${selectedMood.emoji}`);
-      } else {
-        await moodService.log({ mood_score: selectedMood.score, mood_label: selectedMood.label, emotions: selectedEmotions, notes });
-        toast.success(`Mood logged! ${selectedMood.emoji}`);
-      }
-      setSelectedMood(null); setSelectedEmotions([]); setNotes(''); setEditMode(false);
+      await moodService.log({
+        mood_score: selectedMood.score,
+        mood_label: selectedMood.label,
+        emotions: selectedEmotions,
+        notes
+      });
+      toast.success(`Mood logged! ${selectedMood.emoji}`);
+      setSelectedMood(null);
+      setSelectedEmotions([]);
+      setNotes('');
       await loadData();
-    } catch { toast.error('Failed to save mood'); }
+    } catch { toast.error('Failed to log mood'); }
     finally { setSaving(false); }
   };
 
@@ -76,26 +81,38 @@ export default function MoodPage() {
     setSelectedEmotions(prev => prev.includes(emotion) ? prev.filter(e => e !== emotion) : [...prev, emotion]);
   };
 
-  const days = parseInt(chartRange);
-  const dateRange = eachDayOfInterval({ start: subDays(new Date(), days - 1), end: new Date() });
-  const chartData = dateRange.map(day => {
-    const d = format(day, 'yyyy-MM-dd');
-    const log = moods.find(m => m.log_date === d);
-    return { date: format(day, days <= 7 ? 'EEE' : 'MM/dd'), score: log?.mood_score || null, label: log?.mood_label };
-  });
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    const mood = MOODS.find(m => m.score === payload[0]?.value);
-    return (
-      <div className="glass-card p-2.5 text-xs border border-border/50">
-        <p className="font-semibold text-foreground">{label}</p>
-        {mood && <p className="mt-1">{mood.emoji} {mood.label} ({payload[0].value}/10)</p>}
-      </div>
-    );
+  const startEdit = (mood) => {
+    setEditEntry(mood);
+    setEditMood(MOODS.find(m => m.label === mood.mood_label) || null);
+    setEditEmotions(mood.emotions || []);
+    setEditNotes(mood.notes || '');
   };
 
-  const showLogger = !todayMood || editMode;
+  const saveEdit = async () => {
+    if (!editMood) return toast.error('Select a mood');
+    setSaving(true);
+    try {
+      const res = await moodService.update(editEntry.id, {
+        mood_score: editMood.score,
+        mood_label: editMood.label,
+        emotions: editEmotions,
+        notes: editNotes,
+      });
+      setMoods(moods.map(m => m.id === editEntry.id ? res.data.mood : m));
+      setEditEntry(null);
+      toast.success('Mood updated! ✅');
+    } catch { toast.error('Failed to update mood'); }
+    finally { setSaving(false); }
+  };
+
+  const last30 = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
+  const chartData = last30.map(day => {
+    const d = format(day, 'yyyy-MM-dd');
+    const log = moods.find(m => m.log_date === d);
+    return { date: format(day, 'MM/dd'), score: log?.mood_score || null, label: log?.mood_label };
+  }).filter(d => d.score !== null);
+
+  const distributionData = stats?.distribution ? Object.entries(stats.distribution).map(([name, value]) => ({ name, value })) : [];
 
   return (
     <div className="space-y-6">
@@ -108,20 +125,21 @@ export default function MoodPage() {
         <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" /></div>
       ) : (
         <>
-          {/* Today's Mood Logging / Display */}
-          {showLogger ? (
+          {/* Today's Mood Logging */}
+          {!todayMood ? (
             <div className="glass-card p-6 glow-border">
-              <h2 className="font-display font-semibold text-foreground mb-5">
-                {editMode ? '✏️ Update Today\'s Mood' : 'Log Today\'s Mood'}
-              </h2>
+              <h2 className="font-display font-semibold text-foreground mb-5">Log Today's Mood</h2>
 
-              <div className="flex justify-center gap-2 md:gap-4 mb-6 flex-wrap">
+              <div className="flex justify-center gap-3 mb-6 flex-wrap">
                 {MOODS.map(mood => (
                   <button
                     key={mood.label}
                     onClick={() => setSelectedMood(mood)}
                     className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all duration-200 hover:scale-110
-                      ${selectedMood?.label === mood.label ? 'scale-125 ring-2 bg-white/10' : 'opacity-60 hover:opacity-90'}`}
+                      ${selectedMood?.label === mood.label
+                        ? 'scale-125 ring-2 bg-white/10'
+                        : 'opacity-60 hover:opacity-90'
+                      }`}
                     style={selectedMood?.label === mood.label ? { ringColor: mood.color } : {}}
                   >
                     <span className="text-4xl">{mood.emoji}</span>
@@ -133,13 +151,14 @@ export default function MoodPage() {
               {selectedMood && (
                 <div className="space-y-4 animate-in">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">Emotions</label>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">How are you feeling?</label>
                     <div className="flex flex-wrap gap-2">
                       {EMOTIONS.map(e => (
                         <button key={e} onClick={() => toggleEmotion(e)}
                           className={`text-xs px-3 py-1.5 rounded-full transition-all ${selectedEmotions.includes(e)
                             ? 'bg-violet-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.3)]'
-                            : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                            : 'bg-secondary text-muted-foreground hover:text-foreground'
+                            }`}>
                           {e}
                         </button>
                       ))}
@@ -153,44 +172,29 @@ export default function MoodPage() {
                     onChange={e => setNotes(e.target.value)}
                   />
 
-                  <div className="flex gap-3">
-                    {editMode && (
-                      <button onClick={() => { setEditMode(false); setSelectedMood(null); }} className="flex-1 py-3 rounded-xl border border-border text-muted-foreground text-sm hover:text-foreground transition-all">
-                        Cancel
-                      </button>
-                    )}
-                    <button onClick={logMood} disabled={saving} className="flex-1 neon-button py-3 flex items-center justify-center gap-2">
-                      {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>
-                        <Heart size={16} /> {editMode ? 'Update' : 'Save'} Mood {selectedMood.emoji}
-                      </>}
-                    </button>
-                  </div>
+                  <button onClick={logMood} disabled={saving} className="w-full neon-button py-3 flex items-center justify-center gap-2">
+                    {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>
+                      <Heart size={16} /> Save Mood {selectedMood.emoji}
+                    </>}
+                  </button>
                 </div>
               )}
             </div>
           ) : (
             <div className="glass-card p-5 border border-emerald-500/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-5xl">{MOODS.find(m => m.label === todayMood.mood_label)?.emoji || '😊'}</span>
-                  <div>
-                    <p className="font-semibold text-foreground capitalize">Feeling {todayMood.mood_label} today</p>
-                    <p className="text-sm text-muted-foreground">Score: {todayMood.mood_score}/10</p>
-                    {todayMood.emotions?.length > 0 && (
-                      <div className="flex gap-1 mt-2 flex-wrap">
-                        {todayMood.emotions.map(e => <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">{e}</span>)}
-                      </div>
-                    )}
-                  </div>
+              <div className="flex items-center gap-4">
+                <span className="text-5xl">{MOODS.find(m => m.label === todayMood.mood_label)?.emoji || '😊'}</span>
+                <div>
+                  <p className="font-semibold text-foreground capitalize">Feeling {todayMood.mood_label} today</p>
+                  <p className="text-sm text-muted-foreground">Score: {todayMood.mood_score}/10</p>
+                  {todayMood.emotions?.length > 0 && (
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                      {todayMood.emotions.map(e => <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">{e}</span>)}
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={startEdit}
-                  className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:border-violet-500/50 transition-all"
-                >
-                  <Edit2 size={14} /> Edit
-                </button>
               </div>
-              {todayMood.notes && <p className="mt-3 text-sm text-muted-foreground italic">"{todayMood.notes}"</p>}
+              {todayMood.notes && <p className="mt-3 text-sm text-muted-foreground italic">&ldquo;{todayMood.notes}&rdquo;</p>}
             </div>
           )}
 
@@ -216,84 +220,147 @@ export default function MoodPage() {
             </div>
           )}
 
-          {/* Mood Chart with 7/30 toggle */}
-          {chartData.filter(d => d.score).length > 0 && (
+          {/* Mood Chart */}
+          {chartData.length > 0 && (
             <div className="glass-card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
-                  <TrendingUp size={18} className="text-violet-400" />
-                  Mood Trend
-                </h2>
-                <div className="flex rounded-xl border border-border overflow-hidden">
-                  {['7', '30'].map(r => (
-                    <button
-                      key={r}
-                      onClick={() => setChartRange(r)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-all ${chartRange === r ? 'bg-violet-600 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
-                    >
-                      {r}d
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+                <TrendingUp size={18} className="text-violet-400" />
+                30-Day Mood Trend
+              </h2>
               <ResponsiveContainer width="100%" height={180}>
-                {chartRange === '7' ? (
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#666' }} />
-                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#666' }} width={20} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="score" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                ) : (
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="moodFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} />
-                    <YAxis domain={[1, 10]} tick={{ fontSize: 10, fill: '#666' }} width={20} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#moodFill)" dot={{ fill: '#8B5CF6', r: 3 }} />
-                  </AreaChart>
-                )}
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="moodFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} />
+                  <YAxis domain={[1, 10]} tick={{ fontSize: 10, fill: '#666' }} width={20} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }}
+                  />
+                  <Area type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#moodFill)" dot={{ fill: '#8B5CF6', r: 3 }} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           )}
 
-          {/* Recent entries */}
-          <div className="glass-card p-5">
-            <h2 className="font-display font-semibold text-foreground mb-4">Recent Entries</h2>
-            {moods.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No mood entries yet. Start tracking above!</p>
-            ) : (
-              <div className="space-y-3">
-                {moods.slice(0, 10).map(mood => (
-                  <div key={mood.id} className="flex items-center gap-4 p-3 rounded-xl bg-secondary/50">
-                    <span className="text-2xl">{MOODS.find(m => m.label === mood.mood_label)?.emoji || '😊'}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground capitalize">{mood.mood_label}</span>
-                        <span className="text-xs text-muted-foreground">Score: {mood.mood_score}/10</span>
-                      </div>
-                      {mood.emotions?.length > 0 && (
-                        <div className="flex gap-1 mt-1">
-                          {mood.emotions.slice(0, 4).map((e, i, arr) => (
-                            <span key={e} className="text-xs text-muted-foreground">{e}{i < Math.min(3, arr.length - 1) ? ' ·' : ''}</span>
-                          ))}
-                        </div>
-                      )}
-                      {mood.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate italic">"{mood.notes}"</p>}
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(mood.log_date), 'MMM d')}</span>
-                  </div>
-                ))}
+          {/* AI Mood vs Productivity Insight */}
+          <div className="glass-card p-5 border border-violet-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+                <Sparkles size={18} className="text-violet-400" />
+                AI Mood Analysis
+              </h2>
+              {!aiInsight && !loadingAi && (
+                <button onClick={loadAiInsight} className="neon-button text-xs py-1.5 px-3 flex items-center gap-1">
+                  Analyze Data
+                </button>
+              )}
+            </div>
+
+            {loadingAi ? (
+              <div className="py-8 flex flex-col items-center justify-center space-y-3">
+                <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                <p className="text-xs text-muted-foreground animate-pulse">Gemini is looking for patterns...</p>
               </div>
+            ) : aiInsight ? (
+              <div className="space-y-4 animate-in">
+                {aiInsight.patterns && (
+                  <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                    <p className="text-sm text-foreground leading-relaxed">{aiInsight.patterns}</p>
+                  </div>
+                )}
+                {aiInsight.recommendations && (
+                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                    <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Recommendation</h4>
+                    <p className="text-sm text-foreground leading-relaxed">{aiInsight.recommendations}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Click Analyze to find correlations between your mood, habits, and tasks.
+              </p>
             )}
           </div>
+
+          {/* Recent mood log */}
+          <div className="glass-card p-5">
+            <h2 className="font-display font-semibold text-foreground mb-4">Recent Entries</h2>
+            <div className="space-y-3">
+              {moods.slice(0, 10).map(mood => (
+                <div className="flex items-center gap-4 p-3 rounded-xl bg-secondary/50 group">
+                  <span className="text-2xl">{MOODS.find(m => m.label === mood.mood_label)?.emoji || '😊'}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground capitalize">{mood.mood_label}</span>
+                      <span className="text-xs text-muted-foreground">Score: {mood.mood_score}/10</span>
+                    </div>
+                    {mood.emotions?.length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        {mood.emotions.slice(0, 4).map(e => <span key={e} className="text-xs text-muted-foreground">{e}</span>).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key={`s${i}`} className="text-muted-foreground">·</span>, el], [])}
+                      </div>
+                    )}
+                    {mood.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate italic">"{mood.notes}"</p>}
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(mood.log_date), 'MMM d')}</span>
+                  <button onClick={() => startEdit(mood)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-violet-400 transition-all">
+                    <Edit3 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
+      )}
+
+      {/* Edit Mood Modal */}
+      {editEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 glow-border animate-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-lg font-semibold text-foreground">Edit Mood Entry</h2>
+              <button onClick={() => setEditEntry(null)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">{format(new Date(editEntry.log_date), 'MMMM d, yyyy')}</p>
+
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {MOODS.map(m => (
+                <button key={m.label} onClick={() => setEditMood(m)}
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${editMood?.label === m.label ? 'border-violet-500/50 bg-violet-600/20' : 'border-border hover:border-violet-500/30'
+                    }`}>
+                  <span className="text-xl">{m.emoji}</span>
+                  <span className="text-xs text-foreground capitalize">{m.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs text-muted-foreground mb-2 block">Emotions</label>
+              <div className="flex flex-wrap gap-2">
+                {EMOTIONS.map(e => (
+                  <button key={e} onClick={() => setEditEmotions(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
+                    className={`text-xs px-3 py-1.5 rounded-full transition-all ${editEmotions.includes(e) ? 'bg-violet-600/30 text-violet-300 border border-violet-500/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <textarea className="input-field resize-none mb-4" rows={3} placeholder="How are you feeling?..."
+              value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+
+            <div className="flex gap-3">
+              <button onClick={() => setEditEntry(null)} className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground text-sm hover:text-foreground transition-all">Cancel</button>
+              <button onClick={saveEdit} disabled={saving} className="flex-1 neon-button py-2.5 disabled:opacity-50">
+                {saving ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border border-white/30 border-t-white rounded-full animate-spin" /></span> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

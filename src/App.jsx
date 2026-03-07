@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import TasksPage from './pages/TasksPage';
 import JournalPage from './pages/JournalPage';
@@ -16,6 +17,7 @@ import MoodPage from './pages/MoodPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
 import FinancePage from './pages/FinancePage';
+import FocusModePage from './pages/FocusModePage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -29,7 +31,7 @@ const ProtectedRoute = ({ children }) => {
       </div>
     </div>
   );
-  return user ? children : <Navigate to="/landing" replace />;
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 const PublicRoute = ({ children }) => {
@@ -55,10 +57,13 @@ export default function App() {
             }}
           />
           <Routes>
-            <Route path="/" element={<Navigate to="/landing" replace />} />
-            <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
+            {/* Public landing */}
+            <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+
+            {/* Protected app routes */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="tasks" element={<TasksPage />} />
@@ -70,7 +75,11 @@ export default function App() {
               <Route path="ai" element={<AIAssistantPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="finance" element={<FinancePage />} />
+              <Route path="focus" element={<FocusModePage />} />
             </Route>
+
+            {/* Fallback: logged-in users go to dashboard, others to landing */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

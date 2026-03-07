@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { habitService } from '../services';
-import { Plus, Flame, Trash2, X, RotateCcw, History } from 'lucide-react';
+import { Plus, Flame, Trash2, CheckCircle, Circle, X, BarChart3 } from 'lucide-react';
 import { format, eachDayOfInterval, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const ICONS = ['⭐', '💪', '🏃', '📚', '💧', '🧘', '🍎', '💤', '🎯', '🎨', '🎵', '💊'];
 const COLORS = ['#8B5CF6', '#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6'];
@@ -11,11 +12,10 @@ export default function HabitsPage() {
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [historyHabit, setHistoryHabit] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', icon: '⭐', color: '#8B5CF6', frequency: 'daily', target_count: 1 });
   const today = new Date().toISOString().split('T')[0];
+
   const last7Days = eachDayOfInterval({ start: subDays(new Date(), 6), end: new Date() });
-  const last30Days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
 
   useEffect(() => { loadHabits(); }, []);
 
@@ -49,14 +49,6 @@ export default function HabitsPage() {
     } catch { toast.error('Failed to log'); }
   };
 
-  const unlogHabit = async (habit) => {
-    try {
-      await habitService.unlog(habit.id);
-      await loadHabits();
-      toast.success(`↩️ ${habit.name} unmarked`);
-    } catch { toast.error('Failed to unlog'); }
-  };
-
   const deleteHabit = async (id) => {
     if (!confirm('Delete habit?')) return;
     try {
@@ -72,6 +64,20 @@ export default function HabitsPage() {
   };
 
   const completedToday = habits.filter(h => h.habit_logs?.some(l => l.log_date === today && l.completed)).length;
+
+  const chartData = last7Days.map(date => {
+    const dayStr = format(date, 'yyyy-MM-dd');
+    const total = habits.length;
+    let comp = 0;
+    habits.forEach(h => {
+      if (h.habit_logs?.some(l => l.log_date === dayStr && l.completed)) comp++;
+    });
+    return {
+      name: format(date, 'EEE'),
+      completed: comp,
+      rate: total > 0 ? Math.round((comp / total) * 100) : 0
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -90,15 +96,40 @@ export default function HabitsPage() {
         <div className="glass-card p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-foreground">Today's Progress</span>
-            <span className="text-sm text-violet-400 font-semibold">
-              {habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%
-            </span>
+            <span className="text-sm text-violet-400">{habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%</span>
           </div>
           <div className="h-3 bg-secondary rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(139,92,246,0.5)]"
               style={{ width: `${habits.length > 0 ? (completedToday / habits.length) * 100 : 0}%` }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Analysis Chart */}
+      {habits.length > 0 && (
+        <div className="glass-card p-5 border border-violet-500/20">
+          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-sm">
+            <BarChart3 size={16} className="text-violet-400" /> 7-Day Completion Rate
+          </h2>
+          <div className="h-48 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}
+                  contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px' }}
+                  formatter={(val) => [`${val}%`, 'Completion Rate']}
+                />
+                <Bar dataKey="rate" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.rate >= 80 ? '#10B981' : entry.rate >= 40 ? '#8B5CF6' : '#6366F1'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -116,24 +147,17 @@ export default function HabitsPage() {
           {habits.map(habit => {
             const doneToday = habit.habit_logs?.some(l => l.log_date === today && l.completed);
             return (
-              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-80' : ''}`}>
+              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-75' : ''}`}>
                 <div className="flex items-center gap-4">
-                  {/* Complete / Undo button */}
-                  <div className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={() => doneToday ? unlogHabit(habit) : logHabit(habit)}
-                      className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
-                      style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
-                      title={doneToday ? 'Click to undo' : 'Mark as done'}
-                    >
-                      {doneToday ? '✅' : habit.icon}
-                    </button>
-                    {doneToday && (
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                        <RotateCcw size={9} /> undo
-                      </span>
-                    )}
-                  </div>
+                  {/* Complete button */}
+                  <button
+                    onClick={() => logHabit(habit)}
+                    disabled={doneToday}
+                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95 disabled:cursor-default"
+                    style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
+                  >
+                    {doneToday ? '✅' : habit.icon}
+                  </button>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
@@ -161,77 +185,29 @@ export default function HabitsPage() {
                     </div>
                   </div>
 
-                  {/* Streak */}
-                  <div className="text-center flex-shrink-0">
-                    <p className="text-xl font-bold" style={{ color: habit.color }}>🔥 {habit.current_streak}</p>
-                    <p className="text-xs text-muted-foreground">streak</p>
+                  {/* Streak Info */}
+                  <div className="flex gap-4 flex-shrink-0 text-center items-center mr-4">
+                    <div>
+                      <p className="text-xl font-bold" style={{ color: habit.color }}>🔥 {habit.current_streak}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Current</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-foreground opacity-50">👑 {habit.longest_streak || 0}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Longest</p>
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                    <button
-                      onClick={() => setHistoryHabit(habit)}
-                      className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground"
-                      title="View history"
-                    >
-                      <History size={14} />
-                    </button>
-                    <button
-                      onClick={() => deleteHabit(habit.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  {/* Delete */}
+                  <button
+                    onClick={() => deleteHabit(habit.id)}
+                    className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all flex-shrink-0"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* History Modal */}
-      {historyHabit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-6 glow-border animate-in">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-                {historyHabit.icon} {historyHabit.name} — 30 Day History
-              </h2>
-              <button onClick={() => setHistoryHabit(null)} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground"><X size={18} /></button>
-            </div>
-            <div className="mb-4">
-              <div className="flex items-center gap-4 text-sm mb-4">
-                <span className="text-muted-foreground">🔥 Current streak: <strong className="text-foreground">{historyHabit.current_streak}</strong></span>
-                <span className="text-muted-foreground">Best: <strong className="text-foreground">{historyHabit.longest_streak}</strong></span>
-              </div>
-              <div className="grid grid-cols-10 gap-1">
-                {last30Days.map(day => {
-                  const logged = isLoggedOn(historyHabit, day);
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      className="aspect-square rounded-md"
-                      style={{
-                        background: logged ? historyHabit.color + '80' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${logged ? historyHabit.color + '60' : 'rgba(255,255,255,0.08)'}`
-                      }}
-                      title={`${format(day, 'MMM d')} — ${logged ? '✅ Done' : 'Not done'}`}
-                    />
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                <div className="w-3 h-3 rounded-sm" style={{ background: historyHabit.color + '80' }} />
-                <span>Completed</span>
-                <div className="w-3 h-3 rounded-sm bg-white/5 ml-2" />
-                <span>Missed</span>
-              </div>
-            </div>
-            <button onClick={() => setHistoryHabit(null)} className="w-full py-2.5 rounded-xl border border-border text-muted-foreground text-sm hover:text-foreground transition-all">
-              Close
-            </button>
-          </div>
         </div>
       )}
 
