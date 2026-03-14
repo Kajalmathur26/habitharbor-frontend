@@ -8,7 +8,6 @@ import {
   ChevronRight, DollarSign, Timer, Search
 } from 'lucide-react';
 import { searchService } from '../../services';
-import { useNavigate as useNav } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const navItems = [
@@ -79,7 +78,7 @@ function SearchModal({ onClose }) {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 px-1">✅ Tasks</p>
                 {results.tasks.map(t => (
                   <button key={t.id} onClick={() => goTo('/tasks')}
-                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-accent/10 transition-colors">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 capitalize">{t.status}</span>
                     <span className="text-sm text-foreground truncate">{t.title}</span>
                   </button>
@@ -91,7 +90,7 @@ function SearchModal({ onClose }) {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 px-1">🎯 Goals</p>
                 {results.goals.map(g => (
                   <button key={g.id} onClick={() => goTo('/goals')}
-                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-accent/10 transition-colors">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 capitalize">{g.category}</span>
                     <span className="text-sm text-foreground truncate">{g.title}</span>
                   </button>
@@ -103,7 +102,7 @@ function SearchModal({ onClose }) {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 px-1">📖 Journal</p>
                 {results.journal.map(j => (
                   <button key={j.id} onClick={() => goTo('/journal')}
-                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl hover:bg-accent/10 transition-colors">
                     <span className="text-sm text-foreground truncate">{j.title}</span>
                   </button>
                 ))}
@@ -127,7 +126,6 @@ export default function Layout() {
   const [showSearch, setShowSearch] = useState(false);
   const navigate = useNavigate();
 
-  // Keyboard shortcut: Ctrl+K to open search
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -144,7 +142,6 @@ export default function Layout() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-6 border-b border-border/50">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)] flex-shrink-0">
           <span className="text-white text-sm font-bold">P</span>
@@ -157,7 +154,6 @@ export default function Layout() {
         )}
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
@@ -167,8 +163,8 @@ export default function Layout() {
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer group
               ${isActive
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                ? 'bg-violet-600/20 text-violet-600 dark:text-violet-300 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'
               }`
             }
           >
@@ -178,13 +174,12 @@ export default function Layout() {
         ))}
       </nav>
 
-      {/* Bottom section */}
       <div className="px-3 py-4 border-t border-border/50 space-y-1">
         <NavLink
           to="/settings"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer
-            ${isActive ? 'bg-violet-600/20 text-violet-300' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`
+            ${isActive ? 'bg-violet-600/20 text-violet-600 dark:text-violet-300' : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'}`
           }
         >
           <Settings size={18} className="flex-shrink-0" />
@@ -199,7 +194,6 @@ export default function Layout() {
           {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
         </button>
 
-        {/* User info */}
         {sidebarOpen && (
           <div className="flex items-center gap-3 px-3 py-3 mt-2 glass-card rounded-xl">
             {user?.avatar_url ? (
@@ -220,12 +214,11 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Sidebar - Desktop */}
       <aside
-        className={`hidden md:flex flex-col flex-shrink-0 border-r border-border/50 transition-all duration-300 relative
+        className={`hidden md:flex flex-col flex-shrink-0 border-r border-border/50 transition-all duration-300 relative bg-card
           ${sidebarOpen ? 'w-64' : 'w-16'}`}
-        style={{ background: 'hsl(224, 20%, 7%)' }}
       >
         <SidebarContent />
         <button
@@ -240,7 +233,7 @@ export default function Layout() {
       {mobileSidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
-          <aside className="relative w-64 flex flex-col border-r border-border/50 z-10" style={{ background: 'hsl(224, 20%, 7%)' }}>
+          <aside className="relative w-64 flex flex-col border-r border-border/50 z-10 bg-card">
             <SidebarContent />
           </aside>
         </div>
@@ -249,38 +242,37 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border/50 flex-shrink-0" style={{ background: 'hsl(224, 20%, 7%)' }}>
+        <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-40 flex-shrink-0">
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-white/5 text-muted-foreground"
+            className="md:hidden p-2 rounded-lg hover:bg-accent/10 text-muted-foreground"
             onClick={() => setMobileSidebarOpen(true)}
           >
             <Menu size={20} />
           </button>
 
           <div className="flex items-center gap-2 ml-auto">
-            {/* Search button with Ctrl+K hint */}
             <button
               onClick={() => setShowSearch(true)}
               className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors text-sm"
             >
               <Search size={14} />
               <span>Search</span>
-              <kbd className="text-xs bg-white/5 px-1.5 py-0.5 rounded border border-border/50 ml-1">⌘K</kbd>
+              <kbd className="text-xs bg-background px-1.5 py-0.5 rounded border border-border/50 ml-1">⌘K</kbd>
             </button>
             <button
               onClick={() => setShowSearch(true)}
-              className="md:hidden p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+              className="md:hidden p-2 rounded-lg hover:bg-accent/10 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Search size={18} />
             </button>
 
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-lg hover:bg-accent/10 text-muted-foreground hover:text-foreground transition-colors"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <button className="p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors">
+            <button className="p-2 rounded-lg hover:bg-accent/10 text-muted-foreground hover:text-foreground transition-colors">
               <Bell size={18} />
             </button>
             {user?.avatar_url ? (
@@ -293,15 +285,13 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
           <div className="page-transition max-w-7xl mx-auto">
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Search Modal */}
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </div>
   );

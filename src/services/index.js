@@ -25,6 +25,8 @@ export const journalService = {
   create: (data) => api.post('/journal', data),
   update: (id, data) => api.put(`/journal/${id}`, data),
   delete: (id) => api.delete(`/journal/${id}`),
+  uploadImage: (imageData, fileName, mimeType) =>
+    api.post('/journal/upload-image', { imageData, fileName, mimeType }),
 };
 
 // Goals
@@ -43,6 +45,7 @@ export const habitService = {
   getAll: () => api.get('/habits'),
   create: (data) => api.post('/habits', data),
   log: (id, data) => api.post(`/habits/${id}/log`, data),
+  unlog: (id) => api.delete(`/habits/${id}/log`),
   update: (id, data) => api.put(`/habits/${id}`, data),
   delete: (id) => api.delete(`/habits/${id}`),
 };

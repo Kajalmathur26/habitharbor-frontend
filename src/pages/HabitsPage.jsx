@@ -39,14 +39,20 @@ export default function HabitsPage() {
     } catch { toast.error('Failed to create habit'); }
   };
 
-  const logHabit = async (habit) => {
+  const toggleHabitLog = async (habit) => {
     const alreadyDone = habit.habit_logs?.some(l => l.log_date === today && l.completed);
-    if (alreadyDone) return;
     try {
-      await habitService.log(habit.id, {});
+      if (alreadyDone) {
+        await habitService.unlog(habit.id);
+        toast.success(`${habit.icon} ${habit.name} unmarked`);
+      } else {
+        await habitService.log(habit.id, {});
+        toast.success(`${habit.icon} ${habit.name} logged! 🔥`);
+      }
       await loadHabits();
-      toast.success(`${habit.icon} ${habit.name} logged!`);
-    } catch { toast.error('Failed to log'); }
+    } catch {
+      toast.error(alreadyDone ? 'Failed to unlog' : 'Failed to log');
+    }
   };
 
   const deleteHabit = async (id) => {
@@ -151,10 +157,10 @@ export default function HabitsPage() {
                 <div className="flex items-center gap-4">
                   {/* Complete button */}
                   <button
-                    onClick={() => logHabit(habit)}
-                    disabled={doneToday}
-                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95 disabled:cursor-default"
+                    onClick={() => toggleHabitLog(habit)}
+                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
                     style={{ background: doneToday ? habit.color + '40' : habit.color + '20', border: `2px solid ${habit.color}${doneToday ? '80' : '40'}` }}
+                    title={doneToday ? 'Click to unmark' : 'Click to log'}
                   >
                     {doneToday ? '✅' : habit.icon}
                   </button>

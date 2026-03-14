@@ -1,85 +1,218 @@
-import { useState, useEffect } from 'react';
-import { journalService, aiService } from '../services';
-import { Plus, BookOpen, Trash2, Edit3, Search, Sparkles, X, Calendar, ChevronLeft } from 'lucide-react';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { journalService } from '../services';
+import {
+  Plus, Trash2, Edit3, X, Search, Image, Bold, Italic,
+  List, Quote, Heading2, Calendar, Tag, Lock, Save, Loader2,
+  ChevronDown, ChevronUp,
+} from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const MOODS = ['great', 'good', 'okay', 'bad', 'terrible'];
-const MOOD_EMOJIS = { great: '😄', good: '🙂', okay: '😐', bad: '😕', terrible: '😢' };
+const MOODS = ['😊', '😢', '😡', '😌', '🤔', '🥳', '😰', '😴', '🥰', '😤'];
+const BG_COLORS = [
+  { label: 'Default', value: '' },
+  { label: 'Violet', value: '#1e1533' },
+  { label: 'Teal', value: '#0f2723' },
+  { label: 'Rose', value: '#2a1025' },
+  { label: 'Amber', value: '#241b08' },
+];
 
+// ── Rich Text Toolbar ──────────────────────────────────────────────────── //
+function RichToolbar({ editorRef, onImageUpload, uploading }) {
+  const cmd = (command, value = null) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 p-2 border-b border-border/50 bg-secondary/30">
+      <ToolBtn title="Bold" onClick={() => cmd('bold')}><Bold size={14} /></ToolBtn>
+      <ToolBtn title="Italic" onClick={() => cmd('italic')}><Italic size={14} /></ToolBtn>
+      <ToolBtn title="Heading" onClick={() => cmd('formatBlock', 'h2')}>
+        <Heading2 size={14} />
+      </ToolBtn>
+      <ToolBtn title="Bullet List" onClick={() => cmd('insertUnorderedList')}>
+        <List size={14} />
+      </ToolBtn>
+      <ToolBtn title="Blockquote" onClick={() => cmd('formatBlock', 'blockquote')}>
+        <Quote size={14} />
+      </ToolBtn>
+      <div className="w-px h-4 bg-border/50 mx-1" />
+      <label
+        className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5 text-xs"
+        title="Insert Image"
+      >
+        {uploading
+          ? <Loader2 size={14} className="animate-spin text-violet-400" />
+          : <Image size={14} />
+        }
+        <span className="hidden sm:inline text-xs">{uploading ? 'Uploading…' : 'Image'}</span>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onImageUpload}
+          disabled={uploading}
+        />
+      </label>
+    </div>
+  );
+}
+
+function ToolBtn({ children, onClick, title }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────── //
 export default function JournalPage() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('list'); // list, editor
-  const [current, setCurrent] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
-  const [aiPrompts, setAiPrompts] = useState([]);
-  const [loadingPrompts, setLoadingPrompts] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editEntry, setEditEntry] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+
+  const editorRef = useRef(null);
+
   const [form, setForm] = useState({
     title: '',
-    content: '',
+    entry_date: new Date().toISOString().split('T')[0],
     mood: '',
     tags: '',
-    entry_date: new Date().toISOString().split('T')[0],
-    font_style: 'font-body',
+    is_private: true,
     bg_color: '',
-    image_url: ''
+    font_style: '',
   });
-  const [showStickers, setShowStickers] = useState(false);
 
-  useEffect(() => { loadEntries(); }, [search]);
+  useEffect(() => { loadEntries(); }, []);
 
   const loadEntries = async () => {
     try {
-      const params = search ? { search } : {};
-      const res = await journalService.getAll(params);
-      setEntries(res.data.entries);
+      const res = await journalService.getAll();
+      setEntries(res.data?.entries || []);
     } catch {
-      toast.error('Failed to load entries');
+      toast.error('Failed to load journal');
     } finally {
       setLoading(false);
     }
   };
 
-  const newEntry = () => {
-    setCurrent(null);
-    setForm({ title: '', content: '', mood: '', tags: '', entry_date: new Date().toISOString().split('T')[0], font_style: 'font-body', bg_color: '', image_url: '' });
-    setView('editor');
-  };
+  // ── Image upload via Supabase Storage ──
+  const handleImageUpload = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const editEntry = async (entry) => {
-    const res = await journalService.getOne(entry.id);
-    const e = res.data.entry;
-    setCurrent(e);
-    setForm({
-      title: e.title,
-      content: e.content,
-      mood: e.mood || '',
-      tags: e.tags?.join(', ') || '',
-      entry_date: e.entry_date,
-      font_style: e.font_style || 'font-body',
-      bg_color: e.bg_color || '',
-      image_url: e.image_url || ''
-    });
-    setView('editor');
-  };
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image too large (max 5 MB)');
+      return;
+    }
 
-  const saveEntry = async () => {
-    if (!form.title.trim()) return toast.error('Title required');
+    setUploading(true);
     try {
-      const data = { ...form, tags: form.tags ? form.tags.split(',').map(t => t.trim()) : [] };
-      if (current) {
-        const res = await journalService.update(current.id, data);
-        setEntries(entries.map(e => e.id === current.id ? res.data.entry : e));
-        toast.success('Entry updated');
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const base64 = evt.target.result;
+        try {
+          const res = await journalService.uploadImage(base64, file.name, file.type);
+          const url = res.data.url;
+          // Insert image into the editor at cursor position
+          editorRef.current?.focus();
+          document.execCommand('insertImage', false, url);
+          toast.success('Image uploaded!');
+        } catch {
+          toast.error('Failed to upload image');
+        } finally {
+          setUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setUploading(false);
+      toast.error('Failed to read file');
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }, []);
+
+  const openNew = () => {
+    setEditEntry(null);
+    setForm({
+      title: '',
+      entry_date: new Date().toISOString().split('T')[0],
+      mood: '',
+      tags: '',
+      is_private: true,
+      bg_color: '',
+      font_style: '',
+    });
+    setShowForm(true);
+    setTimeout(() => {
+      if (editorRef.current) editorRef.current.innerHTML = '';
+    }, 50);
+  };
+
+  const openEdit = (entry) => {
+    setEditEntry(entry);
+    setForm({
+      title: entry.title,
+      entry_date: entry.entry_date,
+      mood: entry.mood || '',
+      tags: (entry.tags || []).join(', '),
+      is_private: entry.is_private,
+      bg_color: entry.bg_color || '',
+      font_style: entry.font_style || '',
+    });
+    setShowForm(true);
+    setTimeout(() => {
+      if (editorRef.current) editorRef.current.innerHTML = entry.content || '';
+    }, 50);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditEntry(null);
+    if (editorRef.current) editorRef.current.innerHTML = '';
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return toast.error('Title is required');
+    setSaving(true);
+    try {
+      const content = editorRef.current?.innerHTML || '';
+      const payload = {
+        ...form,
+        content,
+        tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        bg_color: form.bg_color || null,
+        font_style: form.font_style || null,
+      };
+
+      if (editEntry) {
+        const res = await journalService.update(editEntry.id, payload);
+        setEntries(entries.map(e => e.id === editEntry.id ? res.data.entry : e));
+        toast.success('Entry updated ✏️');
       } else {
-        const res = await journalService.create(data);
+        const res = await journalService.create(payload);
         setEntries([res.data.entry, ...entries]);
-        toast.success('Journal entry saved ✨');
+        toast.success('Entry saved 📖');
       }
-      setView('list');
+      closeForm();
     } catch {
       toast.error('Failed to save entry');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -90,236 +223,262 @@ export default function JournalPage() {
       setEntries(entries.filter(e => e.id !== id));
       toast.success('Entry deleted');
     } catch {
-      toast.error('Failed to delete entry');
+      toast.error('Failed to delete');
     }
   };
 
-  const getAIPrompts = async () => {
-    setLoadingPrompts(true);
-    try {
-      const res = await aiService.generateJournalPrompts({ mood: form.mood || 'reflective' });
-      setAiPrompts(res.data.prompts);
-    } catch {
-      toast.error('AI prompts unavailable');
-    } finally {
-      setLoadingPrompts(false);
-    }
-  };
-
-  const usePrompt = (prompt) => {
-    setForm(f => ({ ...f, content: f.content + (f.content ? '\n\n' : '') + prompt }));
-    setAiPrompts([]);
-    toast.success('Prompt added!');
-  };
-
-  if (view === 'editor') {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setView('list')} className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground">
-            <ChevronLeft size={20} />
-          </button>
-          <h1 className="font-display text-2xl font-bold text-foreground">{current ? 'Edit Entry' : 'New Entry'}</h1>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Editor */}
-          <div className="lg:col-span-2 space-y-4">
-            <input
-              className="input-field text-lg font-semibold"
-              placeholder="Entry title..."
-              value={form.title}
-              onChange={e => setForm({ ...form, title: e.target.value })}
-            />
-
-            {/* Formatting Toolbar */}
-            <div className="flex flex-wrap items-center gap-2 bg-secondary/30 p-2 rounded-xl border border-border">
-              <button title="Bold" className="p-1 hover:bg-white/10 rounded" onClick={() => setForm(f => ({ ...f, content: f.content + '**bold text**' }))}><b>B</b></button>
-              <button title="Italic" className="p-1 hover:bg-white/10 rounded" onClick={() => setForm(f => ({ ...f, content: f.content + '*italic text*' }))}><i>I</i></button>
-
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <select className="bg-secondary text-xs rounded border border-border p-1" value={form.font_style} onChange={e => setForm({ ...form, font_style: e.target.value })}>
-                <option value="font-body">Inter</option>
-                <option value="font-serif">Serif</option>
-                <option value="font-mono">Mono</option>
-              </select>
-
-              <div className="flex items-center gap-1 text-xs text-muted-foreground ml-1">
-                Bg:
-                <input type="color" className="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent" value={form.bg_color || '#ffffff'} onChange={e => setForm({ ...form, bg_color: e.target.value })} />
-              </div>
-
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <div className="relative">
-                <button title="Stickers" className="p-1 hover:bg-white/10 rounded text-lg lg:leading-[1]" onClick={() => setShowStickers(!showStickers)}>😀</button>
-                {showStickers && (
-                  <div className="absolute top-full mt-1 left-0 z-10 bg-background border border-border p-2 rounded-xl grid grid-cols-5 gap-1 shadow-xl">
-                    {['🌸', '⭐', '🔥', '💡', '🎯', '💔', '🥂', '✨', '🌿', '🐾'].map(s => (
-                      <button key={s} className="hover:scale-125 transition-transform p-1" onClick={() => { setForm(f => ({ ...f, content: f.content + s })); setShowStickers(false); }}>{s}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <label className="p-1 hover:bg-white/10 rounded cursor-pointer text-xs flex items-center gap-1 ml-auto border border-border bg-secondary/50">
-                📷 Image url
-                <input type="text" className="bg-transparent w-20 outline-none p-1" placeholder="URL..." value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} />
-              </label>
-            </div>
-
-            <textarea
-              className={`input-field resize-none min-h-[400px] text-sm leading-relaxed ${form.font_style}`}
-              style={{ backgroundColor: form.bg_color || 'transparent' }}
-              placeholder="Write your thoughts, feelings, ideas, reflections..."
-              value={form.content}
-              onChange={e => setForm({ ...form, content: e.target.value })}
-            />
-
-            <button onClick={saveEntry} className="neon-button w-full py-3 flex items-center justify-center gap-2">
-              <BookOpen size={16} />
-              {current ? 'Update Entry' : 'Save Entry'}
-            </button>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-4">
-            <div className="glass-card p-4">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 block">Entry Details</label>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-                  <input type="date" className="input-field text-sm" value={form.entry_date} onChange={e => setForm({ ...form, entry_date: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Mood</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {MOODS.map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setForm({ ...form, mood: m })}
-                        className={`text-2xl transition-all hover:scale-110 ${form.mood === m ? 'scale-125 filter drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]' : 'opacity-60'}`}
-                      >
-                        {MOOD_EMOJIS[m]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Tags</label>
-                  <input className="input-field text-sm" placeholder="tag1, tag2..." value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
-                </div>
-              </div>
-            </div>
-
-            {/* AI Prompts */}
-            <div className="glass-card p-4">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles size={12} className="text-violet-400" />
-                  AI Prompts
-                </label>
-                <button
-                  onClick={getAIPrompts}
-                  disabled={loadingPrompts}
-                  className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                >
-                  {loadingPrompts ? '...' : 'Generate'}
-                </button>
-              </div>
-
-              {aiPrompts.length > 0 ? (
-                <div className="space-y-2">
-                  {aiPrompts.map((p, i) => (
-                    <button
-                      key={i}
-                      onClick={() => usePrompt(p.prompt)}
-                      className="w-full text-left p-3 rounded-xl bg-violet-600/10 border border-violet-500/20 hover:border-violet-500/40 transition-all"
-                    >
-                      <p className="text-xs text-foreground leading-relaxed">{p.prompt}</p>
-                      <span className="text-xs text-violet-400 mt-1 block">{p.category}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Click Generate to get AI-powered writing prompts based on your mood.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const filtered = entries.filter(e =>
+    e.title?.toLowerCase().includes(search.toLowerCase()) ||
+    (e.content || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Journal</h1>
           <p className="text-muted-foreground text-sm">{entries.length} entries</p>
         </div>
-        <button onClick={newEntry} className="neon-button flex items-center gap-2">
+        <button onClick={openNew} className="neon-button flex items-center gap-2">
           <Plus size={16} /> New Entry
         </button>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
-          className="input-field pl-10"
-          placeholder="Search entries..."
+          className="input-field pl-9"
+          placeholder="Search entries…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-        </div>
-      ) : entries.length === 0 ? (
-        <div className="glass-card p-12 text-center">
-          <BookOpen size={40} className="text-muted-foreground mx-auto mb-3" />
-          <p className="text-foreground font-medium">Your journal is empty</p>
-          <p className="text-sm text-muted-foreground mt-1">Start writing your first entry</p>
-          <button onClick={newEntry} className="neon-button mt-4 inline-flex items-center gap-2">
-            <Plus size={16} /> Write Something
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {entries.map(entry => (
-            <div
-              key={entry.id}
-              className="glass-card-hover p-5 cursor-pointer group"
-              onClick={() => editEntry(entry)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{format(new Date(entry.entry_date), 'MMM d, yyyy')}</span>
-                </div>
-                {entry.mood && <span className="text-xl">{MOOD_EMOJIS[entry.mood]}</span>}
+      {/* Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-card w-full max-w-2xl p-0 glow-border animate-in overflow-hidden mb-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                {editEntry ? 'Edit Entry' : 'New Journal Entry'}
+              </h2>
+              <button onClick={closeForm} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              {/* Title */}
+              <div className="px-5 pt-4">
+                <input
+                  className="input-field text-lg font-medium"
+                  placeholder="Entry title…"
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  required
+                />
               </div>
-              <h3 className="font-semibold text-foreground mb-2 line-clamp-1">{entry.title}</h3>
-              <div className="flex items-center justify-between mt-3">
+
+              {/* Meta Row */}
+              <div className="px-5 pt-3 flex flex-wrap gap-3">
+                {/* Date */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground"><Calendar size={13} /></span>
+                  <input
+                    type="date"
+                    className="bg-secondary text-foreground rounded px-2 py-1 border-none outline-none text-xs cursor-pointer [color-scheme:light] dark:[color-scheme:dark] shadow-sm"
+                    value={form.entry_date}
+                    onChange={e => setForm({ ...form, entry_date: e.target.value })}
+                  />
+                </div>
+
+                {/* Mood */}
                 <div className="flex gap-1 flex-wrap">
-                  {entry.tags?.slice(0, 2).map(tag => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded bg-violet-600/20 text-violet-300">{tag}</span>
+                  {MOODS.map(m => (
+                    <button
+                      type="button" key={m}
+                      onClick={() => setForm({ ...form, mood: form.mood === m ? '' : m })}
+                      className={`text-lg p-0.5 rounded transition-all hover:scale-110 ${form.mood === m ? 'ring-1 ring-violet-400 bg-violet-500/10' : 'opacity-50 hover:opacity-100'}`}
+                    >
+                      {m}
+                    </button>
                   ))}
                 </div>
+
+                {/* Private toggle */}
                 <button
-                  onClick={e => { e.stopPropagation(); deleteEntry(entry.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all"
+                  type="button"
+                  onClick={() => setForm({ ...form, is_private: !form.is_private })}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all ${form.is_private ? 'bg-violet-500/20 text-violet-300' : 'bg-secondary text-muted-foreground'}`}
                 >
-                  <Trash2 size={14} />
+                  <Lock size={11} /> {form.is_private ? 'Private' : 'Public'}
+                </button>
+
+                {/* Background Color */}
+                <div className="flex items-center gap-1">
+                  {BG_COLORS.map(bg => (
+                    <button
+                      type="button" key={bg.value}
+                      onClick={() => setForm({ ...form, bg_color: bg.value })}
+                      title={bg.label}
+                      className={`w-5 h-5 rounded-full border-2 transition-all ${form.bg_color === bg.value ? 'border-white scale-110' : 'border-transparent hover:scale-105'}`}
+                      style={{ background: bg.value || '#1f2937' }}
+                    />
+                  ))}
+                </div>
+
+                {/* Font Style */}
+                <select
+                  className="bg-secondary text-foreground rounded px-2 py-1 border-none outline-none text-xs cursor-pointer shadow-sm font-medium"
+                  value={form.font_style}
+                  onChange={e => setForm({ ...form, font_style: e.target.value })}
+                >
+                  <option value="">Default Font</option>
+                  <option value="serif">Serif</option>
+                  <option value="monospace">Monospace</option>
+                  <option value="cursive">Cursive</option>
+                </select>
+              </div>
+
+              {/* Tags */}
+              <div className="px-5 pt-2 flex items-center gap-2">
+                <Tag size={13} className="text-muted-foreground flex-shrink-0" />
+                <input
+                  className="flex-1 bg-transparent border-none outline-none text-xs text-muted-foreground placeholder:text-muted-foreground/50"
+                  placeholder="Tags (comma separated)…"
+                  value={form.tags}
+                  onChange={e => setForm({ ...form, tags: e.target.value })}
+                />
+              </div>
+
+              {/* Rich Text Editor */}
+              <div className="mx-5 mt-3 rounded-xl overflow-hidden border border-border/50">
+                <RichToolbar editorRef={editorRef} onImageUpload={handleImageUpload} uploading={uploading} />
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="min-h-48 max-h-96 overflow-y-auto p-4 text-sm text-foreground outline-none leading-relaxed"
+                  style={{ background: form.bg_color || undefined, fontFamily: form.font_style || undefined }}
+                  data-placeholder="Write your thoughts…"
+                  onInput={() => { /* handled on submit via innerHTML */ }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 px-5 py-4">
+                <button type="button" onClick={closeForm} className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all text-sm">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving || uploading} className="flex-1 neon-button py-2.5 flex items-center justify-center gap-2 disabled:opacity-60">
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                  {saving ? 'Saving…' : editEntry ? 'Update' : 'Save Entry'}
                 </button>
               </div>
-            </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Entries List */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <Edit3 size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="text-foreground font-medium">{search ? 'No entries match your search' : 'No entries yet'}</p>
+          {!search && (
+            <button onClick={openNew} className="neon-button mt-4 inline-flex items-center gap-2">
+              <Plus size={15} /> Start Writing
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(entry => (
+            <EntryCard
+              key={entry.id}
+              entry={entry}
+              expanded={expandedId === entry.id}
+              onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+              onEdit={() => openEdit(entry)}
+              onDelete={() => deleteEntry(entry.id)}
+            />
           ))}
         </div>
+      )}
+
+      {/* Editor placeholder CSS */}
+      <style>{`
+        [contenteditable][data-placeholder]:empty::before {
+          content: attr(data-placeholder);
+          color: hsl(215 20% 45%);
+          pointer-events: none;
+        }
+        [contenteditable] img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+        [contenteditable] blockquote { border-left: 3px solid #8B5CF6; padding-left: 12px; color: hsl(215 20% 65%); margin: 8px 0; font-style: italic; }
+        [contenteditable] h2 { font-size: 1.1rem; font-weight: 700; margin: 8px 0 4px; }
+        [contenteditable] ul { list-style: disc; padding-left: 18px; }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Entry Card ─────────────────────────────────────────────────────────── //
+function EntryCard({ entry, expanded, onToggle, onEdit, onDelete }) {
+  return (
+    <div
+      className="glass-card overflow-hidden group transition-all"
+      style={{ background: entry.bg_color || undefined }}
+    >
+      {/* Header */}
+      <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={onToggle}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {entry.mood && <span className="text-lg">{entry.mood}</span>}
+            <h3 className="font-semibold text-foreground truncate">{entry.title}</h3>
+            {entry.is_private && <Lock size={11} className="text-muted-foreground flex-shrink-0" />}
+          </div>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-xs text-muted-foreground">
+              {entry.entry_date ? format(parseISO(entry.entry_date), 'EEE, MMM d, yyyy') : ''}
+            </span>
+            {entry.tags?.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {entry.tags.slice(0, 3).map(tag => (
+                  <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={e => { e.stopPropagation(); onEdit(); }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all">
+            <Edit3 size={13} />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onDelete(); }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-rose-400 transition-all">
+            <Trash2 size={13} />
+          </button>
+          <button className="p-1 text-muted-foreground">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {expanded && entry.content && (
+        <div
+          className="px-4 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/30 prose-journal"
+          style={{ fontFamily: entry.font_style || undefined }}
+          dangerouslySetInnerHTML={{ __html: entry.content }}
+        />
       )}
     </div>
   );

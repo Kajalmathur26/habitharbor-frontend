@@ -15,14 +15,19 @@ export const AuthProvider = ({ children }) => {
       setUser(JSON.parse(savedUser));
       // Verify token is still valid
       authService.getProfile()
-        .then(res => setUser(res.data.user))
+        .then(res => {
+          setUser(res.data.user);
+          setLoading(false);
+        })
         .catch(() => {
           localStorage.removeItem('planora_token');
           localStorage.removeItem('planora_user');
           setUser(null);
+          setLoading(false);
         });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (email, password) => {

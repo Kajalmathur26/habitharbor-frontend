@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { taskService } from '../services';
 import { Play, Pause, RotateCcw, Coffee, Timer, CheckCircle, History } from 'lucide-react';
 
@@ -27,8 +27,32 @@ export default function FocusModePage() {
     const totalTime = mode === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
 
     useEffect(() => {
-        taskService.getAll({ status: 'pending' }).then(r => setTasks(r.data.tasks)).catch(() => { });
+        taskService.getAll({ status: 'pending' }).then(r => setTasks(r.data?.tasks || [])).catch(() => { });
     }, []);
+
+    // Store onSessionEnd in a ref so useEffect always has the latest version
+    // without needing to restart the timer interval on every re-render
+    const onSessionEndRef = useRef(null);
+    onSessionEndRef.current = () => {
+        if (mode === 'focus') {
+            const session = {
+                id: Date.now(),
+                task: selectedTask?.title || 'Free focus',
+                duration: 25,
+                completedAt: new Date().toISOString(),
+            };
+            setSessions(prev => {
+                const updated = [session, ...prev.slice(0, 19)];
+                localStorage.setItem('planora_focus_sessions', JSON.stringify(updated));
+                return updated;
+            });
+            setMode('break');
+            setTimeLeft(BREAK_DURATION);
+        } else {
+            setMode('focus');
+            setTimeLeft(FOCUS_DURATION);
+        }
+    };
 
     useEffect(() => {
         if (running) {
@@ -37,7 +61,7 @@ export default function FocusModePage() {
                     if (t <= 1) {
                         clearInterval(intervalRef.current);
                         setRunning(false);
-                        onSessionEnd();
+                        onSessionEndRef.current();
                         return 0;
                     }
                     return t - 1;
@@ -60,25 +84,6 @@ export default function FocusModePage() {
         return () => { document.title = 'Planora'; };
     }, [timeLeft, running, mode]);
 
-    const onSessionEnd = useCallback(() => {
-        if (mode === 'focus') {
-            const session = {
-                id: Date.now(),
-                task: selectedTask?.title || 'Free focus',
-                duration: 25,
-                completedAt: new Date().toISOString(),
-            };
-            const updated = [session, ...sessions.slice(0, 19)];
-            setSessions(updated);
-            localStorage.setItem('planora_focus_sessions', JSON.stringify(updated));
-            // Auto switch to break
-            setMode('break');
-            setTimeLeft(BREAK_DURATION);
-        } else {
-            setMode('focus');
-            setTimeLeft(FOCUS_DURATION);
-        }
-    }, [mode, selectedTask, sessions]);
 
     const toggleTimer = () => setRunning(r => !r);
 

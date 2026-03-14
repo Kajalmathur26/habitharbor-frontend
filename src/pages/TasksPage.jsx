@@ -262,17 +262,17 @@ export default function TasksPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            { key: 'pending', label: 'To Do', color: 'amber' },
-            { key: 'in_progress', label: 'In Progress', color: 'blue' },
-            { key: 'completed', label: 'Done', color: 'emerald' },
-          ].map(({ key, label, color }) => (
-            <div key={key} className="glass-card p-4">
+            { key: 'pending', label: 'To Do', dot: 'bg-amber-400', badgeBg: 'bg-amber-500/20', badgeText: 'text-amber-600 dark:text-amber-400' },
+            { key: 'in_progress', label: 'In Progress', dot: 'bg-blue-400', badgeBg: 'bg-blue-500/20', badgeText: 'text-blue-600 dark:text-blue-400' },
+            { key: 'completed', label: 'Done', dot: 'bg-emerald-400', badgeBg: 'bg-emerald-500/20', badgeText: 'text-emerald-600 dark:text-emerald-400' },
+          ].map(({ key, label, dot, badgeBg, badgeText }) => (
+            <div key={key} className="glass-card p-4 w-full">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full bg-${color}-400`} />
+                  <span className={`w-2 h-2 rounded-full ${dot}`} />
                   {label}
                 </h3>
-                <span className={`text-xs px-2 py-0.5 rounded-full bg-${color}-500/15 text-${color}-400`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeBg} ${badgeText}`}>
                   {groupedTasks[key]?.length || 0}
                 </span>
               </div>

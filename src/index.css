@@ -72,7 +72,9 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/50 backdrop-blur-xl border border-white/5 rounded-2xl;
+    /* Changed from border-white/5 to border-border (which uses our variable) */
+    @apply bg-card/80 backdrop-blur-xl border border-border rounded-2xl;
+    box-shadow: var(--card-shadow);
   }
 
   .glass-card-hover {
@@ -84,18 +86,18 @@
   }
 
   .glow-border {
-    @apply border border-violet-500/30 ;
+    @apply border border-violet-500/30;
     box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
   }
 
   .neon-button {
-  @apply bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl px-6 py-2.5 transition-all duration-300 active:scale-95;
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
-}
+    @apply bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl px-6 py-2.5 transition-all duration-300 active:scale-95;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  }
 
-.neon-button:hover {
-  box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
-}
+  .neon-button:hover {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+  }
 
   .sidebar-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200 cursor-pointer;
@@ -106,7 +108,8 @@
   }
 
   .stat-card {
-    @apply glass-card p-5 hover:border-violet-500/20 transition-all duration-300;
+    /* Adds a subtle hover lift for a professional feel */
+    @apply glass-card p-5 hover:border-violet-500/30 hover:-translate-y-1 transition-all duration-300;
   }
 
   .input-field {
