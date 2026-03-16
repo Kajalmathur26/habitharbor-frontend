@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { financeService } from '../services';
+import { authService, financeService } from '../services';
+import { useAuth } from '../context/AuthContext';
 import {
     DollarSign, Plus, Trash2, Edit3, X, TrendingUp, TrendingDown,
     PieChart as PieIcon, BarChart2, Calendar, Filter, ChevronDown
@@ -13,7 +14,7 @@ import toast from 'react-hot-toast';
 
 const CATEGORIES_EXPENSE = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Education', 'Bills', 'Rent', 'Other'];
 const CATEGORIES_INCOME = ['Salary', 'Freelance', 'Business', 'Investment', 'Gift', 'Other'];
-const PIE_COLORS = ['#8B5CF6', '#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
+const PIE_COLORS = ['#8B5CF6', '#F43F5E', '#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
 const PERIODS = [
     { label: '7 days', days: 7 },
     { label: '30 days', days: 30 },
@@ -23,6 +24,7 @@ const PERIODS = [
 const INR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function FinancePage() {
+    const { user, updateUser } = useAuth();
     const [transactions, setTransactions] = useState([]);
     const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0, todayIncome: 0, todayExpense: 0 });
     const [analytics, setAnalytics] = useState({ categoryBreakdown: [], dailyTrend: [], weeklySummary: [] });
@@ -32,7 +34,7 @@ export default function FinancePage() {
     const [period, setPeriod] = useState(30);
     const [filter, setFilter] = useState('');
     const [activeChart, setActiveChart] = useState('trend');
-    const [budget, setBudget] = useState(() => parseFloat(localStorage.getItem('planora_budget') || '0'));
+    const [budget, setBudget] = useState(user?.preferences?.finance_budget || 0);
     const [budgetInput, setBudgetInput] = useState('');
     const [form, setForm] = useState({ type: 'expense', amount: '', category: 'Food', description: '', date: new Date().toISOString().split('T')[0] });
 
@@ -91,13 +93,20 @@ export default function FinancePage() {
         setForm({ type: 'expense', amount: '', category: 'Food', description: '', date: new Date().toISOString().split('T')[0] });
     };
 
-    const saveBudget = () => {
+    const saveBudget = async () => {
         const val = parseFloat(budgetInput);
         if (isNaN(val) || val <= 0) return toast.error('Enter valid budget');
-        setBudget(val);
-        localStorage.setItem('planora_budget', String(val));
-        setBudgetInput('');
-        toast.success('Budget set!');
+        try {
+            const updatedProfile = await authService.updateProfile({ 
+                preferences: { ...user.preferences, finance_budget: val } 
+            });
+            updateUser(updatedProfile.data.user);
+            setBudget(val);
+            setBudgetInput('');
+            toast.success('Budget saved to profile! 🏦');
+        } catch {
+            toast.error('Failed to save budget');
+        }
     };
 
     const budgetUsed = budget > 0 ? Math.min((summary.totalExpense / budget) * 100, 100) : 0;
@@ -105,7 +114,7 @@ export default function FinancePage() {
 
     if (loading) return (
         <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
         </div>
     );
 
@@ -122,7 +131,7 @@ export default function FinancePage() {
                     <div className="flex gap-1">
                         {PERIODS.map(p => (
                             <button key={p.days} onClick={() => setPeriod(p.days)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === p.days ? 'bg-violet-600 text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === p.days ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
                                 {p.label}
                             </button>
                         ))}
@@ -159,8 +168,8 @@ export default function FinancePage() {
                     <p className="text-xs text-muted-foreground mt-0.5">Total Spent</p>
                 </div>
                 <div className="stat-card">
-                    <div className="inline-flex p-2 rounded-lg bg-violet-500/15 mb-3">
-                        <DollarSign size={18} className="text-violet-400" />
+                    <div className="inline-flex p-2 rounded-lg bg-primary/15 mb-3">
+                        <DollarSign size={18} className="text-primary" />
                     </div>
                     <p className={`text-xl font-bold ${summary.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{INR(summary.balance)}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Net Balance</p>
@@ -196,7 +205,7 @@ export default function FinancePage() {
                         </div>
                         <div className="h-3 bg-secondary rounded-full overflow-hidden">
                             <div
-                                className={`h-full rounded-full transition-all duration-700 ${budgetAlert ? 'bg-gradient-to-r from-rose-500 to-red-400' : 'bg-gradient-to-r from-violet-600 to-indigo-500'}`}
+                                className={`h-full rounded-full transition-all duration-700 ${budgetAlert ? 'bg-gradient-to-r from-rose-500 to-red-400' : 'bg-primary'}`}
                                 style={{ width: `${budgetUsed}%` }}
                             />
                         </div>
@@ -210,17 +219,18 @@ export default function FinancePage() {
             <div className="glass-card p-5">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
-                        <BarChart2 size={18} className="text-violet-400" />
+                        <BarChart2 size={18} className="text-primary" />
                         Analytics
                     </h2>
                     <div className="flex gap-2">
+                        {/* Charts selector */}
                         {[
                             { key: 'trend', label: 'Trend' },
                             { key: 'category', label: 'Categories' },
                             { key: 'weekly', label: 'Weekly' },
                         ].map(({ key, label }) => (
                             <button key={key} onClick={() => setActiveChart(key)}
-                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${activeChart === key ? 'bg-violet-600 text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${activeChart === key ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
                                 {label}
                             </button>
                         ))}
@@ -230,22 +240,49 @@ export default function FinancePage() {
                 {activeChart === 'trend' && analytics.dailyTrend.length > 0 && (
                     <ResponsiveContainer width="100%" height={200}>
                         <AreaChart data={analytics.dailyTrend}>
-                            <defs>
-                                <linearGradient id="incomeG" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="expenseG" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} tickFormatter={d => format(new Date(d + 'T00:00:00'), 'MM/dd')} />
-                            <YAxis tick={{ fontSize: 10, fill: '#666' }} width={40} tickFormatter={v => `₹${v}`} />
-                            <Tooltip contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }} formatter={v => [`₹${v}`, '']} />
-                            <Area type="monotone" dataKey="income" stroke="#10B981" strokeWidth={2} fill="url(#incomeG)" name="Income" />
-                            <Area type="monotone" dataKey="expense" stroke="#EF4444" strokeWidth={2} fill="url(#expenseG)" name="Expense" />
-                            <Legend />
+                            <XAxis 
+                                dataKey="date" 
+                                tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} 
+                                tickFormatter={d => format(new Date(d + 'T00:00:00'), 'MM/dd')}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis 
+                                tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} 
+                                width={40} 
+                                tickFormatter={v => `₹${v}`}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <Tooltip 
+                                contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))', 
+                                    border: '1px solid hsl(var(--border))', 
+                                    borderRadius: '8px', 
+                                    fontSize: '12px',
+                                    color: 'hsl(var(--foreground))'
+                                }} 
+                                formatter={v => [`₹${v}`, '']}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="income" 
+                                stroke="#10B981" 
+                                fill="#10B981" 
+                                fillOpacity={0.1}
+                                name="Income" 
+                                dot={false}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="expense" 
+                                stroke="#EF4444" 
+                                fill="#EF4444" 
+                                fillOpacity={0.1}
+                                name="Expense" 
+                                dot={false}
+                            />
+                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', color: 'hsl(var(--foreground))' }} />
                         </AreaChart>
                     </ResponsiveContainer>
                 )}
@@ -258,7 +295,16 @@ export default function FinancePage() {
                                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={v => [`₹${v}`, '']} contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }} />
+                            <Tooltip 
+                                formatter={v => [`₹${v}`, '']} 
+                                contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))', 
+                                    border: '1px solid hsl(var(--border))', 
+                                    borderRadius: '8px', 
+                                    fontSize: '12px',
+                                    color: 'hsl(var(--foreground))'
+                                }} 
+                            />
                         </PieChart>
                     </ResponsiveContainer>
                 )}
@@ -266,12 +312,21 @@ export default function FinancePage() {
                 {activeChart === 'weekly' && analytics.weeklySummary.length > 0 && (
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={analytics.weeklySummary}>
-                            <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#666' }} tickFormatter={d => format(new Date(d + 'T00:00:00'), 'MMM d')} />
-                            <YAxis tick={{ fontSize: 10, fill: '#666' }} width={40} tickFormatter={v => `₹${v}`} />
-                            <Tooltip contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }} formatter={v => [`₹${v}`, '']} />
+                            <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} tickFormatter={d => format(new Date(d + 'T00:00:00'), 'MMM d')} />
+                            <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} width={40} tickFormatter={v => `₹${v}`} />
+                            <Tooltip 
+                                contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))', 
+                                    border: '1px solid hsl(var(--border))', 
+                                    borderRadius: '8px', 
+                                    fontSize: '12px',
+                                    color: 'hsl(var(--foreground))'
+                                }} 
+                                formatter={v => [`₹${v}`, '']} 
+                            />
                             <Bar dataKey="income" fill="#10B981" radius={[4, 4, 0, 0]} name="Income" />
                             <Bar dataKey="expense" fill="#EF4444" radius={[4, 4, 0, 0]} name="Expense" />
-                            <Legend />
+                            <Legend wrapperStyle={{ paddingTop: '10px', color: 'hsl(var(--foreground))' }} />
                         </BarChart>
                     </ResponsiveContainer>
                 )}
@@ -290,7 +345,7 @@ export default function FinancePage() {
                     <div className="flex gap-2">
                         {['', 'income', 'expense'].map(f => (
                             <button key={f} onClick={() => setFilter(f)}
-                                className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all ${filter === f ? 'bg-violet-600 text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                                className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all ${filter === f ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
                                 {f || 'All'}
                             </button>
                         ))}

@@ -18,13 +18,14 @@ import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
 import FinancePage from './pages/FinancePage';
 import FocusModePage from './pages/FocusModePage';
+import AdminPage from './pages/AdminPage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center animate-pulse">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-pulse">
           <span className="text-white text-xl font-bold">P</span>
         </div>
         <p className="text-muted-foreground text-sm">Loading Planora...</p>
@@ -49,9 +50,9 @@ export default function App() {
             position="top-right"
             toastOptions={{
               style: {
-                background: 'hsl(224, 20%, 9%)',
-                color: 'hsl(210, 40%, 95%)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
+                background: 'var(--card)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--primary-glow)',
                 borderRadius: '12px',
               },
             }}
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="finance" element={<FinancePage />} />
               <Route path="focus" element={<FocusModePage />} />
+              <Route path="admin" element={<AdminPage />} />
             </Route>
 
             {/* Fallback: logged-in users go to dashboard, others to landing */}

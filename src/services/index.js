@@ -6,6 +6,8 @@ export const authService = {
   login: (data) => api.post('/auth/login', data),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/profile', data),
+  deleteAccount: () => api.delete('/auth/profile'),
+  googleLogin: (data) => api.post('/auth/google-login', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
 };
 

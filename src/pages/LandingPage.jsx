@@ -36,7 +36,7 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 border-b border-border/30 backdrop-blur-xl" style={{ background: 'rgba(13,13,26,0.85)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.5)]">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_var(--primary-glow)]">
             <span className="text-white text-sm font-bold">P</span>
           </div>
           <span className="font-bold text-xl text-foreground tracking-tight">Planora</span>
@@ -45,7 +45,7 @@ export default function LandingPage() {
           <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
             Sign In
           </Link>
-          <Link to="/register" className="text-sm px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-medium hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+          <Link to="/register" className="text-sm px-4 py-2 rounded-xl bg-primary text-white font-medium hover:opacity-90 transition-opacity shadow-[0_0_20px_var(--primary-glow)]">
             Get Started
           </Link>
         </div>
@@ -55,19 +55,19 @@ export default function LandingPage() {
       <section className="relative min-h-screen flex items-center justify-center pt-20 pb-16 px-6 overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-900/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl" />
           {/* Grid pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{
-            backgroundImage: 'linear-gradient(rgba(139,92,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.5) 1px, transparent 1px)',
+            backgroundImage: 'linear-gradient(hsl(var(--primary) / 0.5) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary) / 0.5) 1px, transparent 1px)',
             backgroundSize: '50px 50px'
           }} />
         </div>
 
         <div className="relative text-center max-w-4xl mx-auto">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-violet-500/30 bg-violet-600/10 text-violet-300 text-xs font-medium mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-medium mb-8">
             <Sparkles size={12} />
             Powered by Gemini AI
             <Sparkles size={12} />
@@ -75,14 +75,14 @@ export default function LandingPage() {
 
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_60px_rgba(139,92,246,0.5)] animate-[float_3s_ease-in-out_infinite]">
+            <div className="w-24 h-24 rounded-3xl bg-primary flex items-center justify-center shadow-[0_0_60px_var(--primary-glow)] animate-[float_3s_ease-in-out_infinite]">
               <span className="text-white text-5xl font-bold">P</span>
             </div>
           </div>
 
           <h1 className="font-display text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight">
             Plan Better.{' '}
-            <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Live Better.
             </span>
           </h1>
@@ -94,7 +94,7 @@ export default function LandingPage() {
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link
               to="/register"
-              className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold text-lg hover:opacity-90 transition-all shadow-[0_0_30px_rgba(139,92,246,0.4)] hover:shadow-[0_0_50px_rgba(139,92,246,0.6)] hover:scale-105"
+              className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-primary text-white font-semibold text-lg hover:opacity-90 transition-all shadow-[0_0_30px_var(--primary-glow)] hover:shadow-[0_0_50px_rgba(var(--primary),0.6)] hover:scale-105"
             >
               GET STARTED — It's Free
               <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -111,7 +111,7 @@ export default function LandingPage() {
           <div className="flex items-center justify-center gap-8 md:gap-16 mt-16 flex-wrap">
             {STATS.map(({ value, label }) => (
               <div key={label} className="text-center">
-                <p className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">{value}</p>
+                <p className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">{value}</p>
                 <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wider">{label}</p>
               </div>
             ))}

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { journalService } from '../services';
+import { journalService, aiService } from '../services';
 import {
   Plus, Trash2, Edit3, X, Search, Image, Bold, Italic,
   List, Quote, Heading2, Calendar, Tag, Lock, Save, Loader2,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Sparkles, Palette, Smile
 } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -15,10 +16,22 @@ const BG_COLORS = [
   { label: 'Teal', value: '#0f2723' },
   { label: 'Rose', value: '#2a1025' },
   { label: 'Amber', value: '#241b08' },
+  { label: 'Light Blue', value: 'hsl(210, 100%, 98%)' },
+  { label: 'Soft Yellow', value: 'hsl(60, 100%, 98%)' },
+  { label: 'Mint', value: 'hsl(140, 100%, 98%)' },
+  { label: 'White', value: '#ffffff' },
+];
+
+const FONTS = [
+  { label: 'Default Font', value: '' },
+  { label: 'Serif (Merriweather)', value: '"Merriweather", serif' },
+  { label: 'Monospace (Fira Code)', value: '"Fira Code", monospace' },
+  { label: 'Cursive (Caveat)', value: '"Caveat", cursive' },
+  { label: 'Sans (Inter)', value: '"Inter", sans-serif' },
 ];
 
 // ── Rich Text Toolbar ──────────────────────────────────────────────────── //
-function RichToolbar({ editorRef, onImageUpload, uploading }) {
+function RichToolbar({ editorRef, onImageUpload, uploading, onAiSuggest, loadingAi, onEmojiToggle }) {
   const cmd = (command, value = null) => {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
@@ -28,22 +41,59 @@ function RichToolbar({ editorRef, onImageUpload, uploading }) {
     <div className="flex flex-wrap items-center gap-1 p-2 border-b border-border/50 bg-secondary/30">
       <ToolBtn title="Bold" onClick={() => cmd('bold')}><Bold size={14} /></ToolBtn>
       <ToolBtn title="Italic" onClick={() => cmd('italic')}><Italic size={14} /></ToolBtn>
-      <ToolBtn title="Heading" onClick={() => cmd('formatBlock', 'h2')}>
-        <Heading2 size={14} />
-      </ToolBtn>
+
+      <div className="flex items-center gap-1 bg-background/50 rounded-lg px-1 border border-border/50">
+        <select
+          className="bg-secondary text-foreground text-[10px] font-medium py-1 px-2 rounded outline-none cursor-pointer border border-border/50"
+          onChange={(e) => cmd('formatBlock', e.target.value)}
+          defaultValue="p"
+        >
+          <option value="p" className="bg-secondary text-foreground">Normal Text</option>
+          <option value="h1" className="bg-secondary text-foreground">Heading 1</option>
+          <option value="h2" className="bg-secondary text-foreground">Heading 2</option>
+          <option value="h3" className="bg-secondary text-foreground">Heading 3</option>
+          <option value="h4" className="bg-secondary text-foreground">Heading 4</option>
+          <option value="h5" className="bg-secondary text-foreground">Heading 5</option>
+          <option value="h6" className="bg-secondary text-foreground">Heading 6</option>
+        </select>
+      </div>
+
       <ToolBtn title="Bullet List" onClick={() => cmd('insertUnorderedList')}>
         <List size={14} />
       </ToolBtn>
       <ToolBtn title="Blockquote" onClick={() => cmd('formatBlock', 'blockquote')}>
         <Quote size={14} />
       </ToolBtn>
+
+      <div className="relative flex items-center group cursor-pointer border border-border/50 rounded-lg px-1.5 py-0.5 ml-1">
+        <Palette size={14} className="text-muted-foreground mr-1" />
+        <input 
+          type="color" 
+          onChange={(e) => cmd('foreColor', e.target.value)}
+          className="w-4 h-4 p-0 border-0 rounded cursor-pointer pointer-events-auto"
+          title="Text Color"
+        />
+      </div>
+
+      <div className="w-px h-4 bg-border/50 mx-1" />
+
+      {/* Emoji Button in Toolbar */}
+      <button
+        type="button"
+        title="Emojis"
+        onClick={onEmojiToggle} // Passed from parent
+        className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Smile size={16} />
+      </button>
+
       <div className="w-px h-4 bg-border/50 mx-1" />
       <label
         className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5 text-xs"
         title="Insert Image"
       >
         {uploading
-          ? <Loader2 size={14} className="animate-spin text-violet-400" />
+          ? <Loader2 size={14} className="animate-spin text-primary" />
           : <Image size={14} />
         }
         <span className="hidden sm:inline text-xs">{uploading ? 'Uploading…' : 'Image'}</span>
@@ -82,6 +132,8 @@ export default function JournalPage() {
   const [showForm, setShowForm] = useState(false);
   const [editEntry, setEditEntry] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const editorRef = useRef(null);
 
@@ -92,6 +144,7 @@ export default function JournalPage() {
     tags: '',
     is_private: true,
     bg_color: '',
+    bg_image_url: '',
     font_style: '',
   });
 
@@ -145,6 +198,27 @@ export default function JournalPage() {
     e.target.value = '';
   }, []);
 
+  const handleAiSuggest = async () => {
+    setLoadingAi(true);
+    try {
+      const res = await aiService.generateJournalPrompts();
+      const prompts = res.data.prompts || [];
+      const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+
+      if (randomPrompt && editorRef.current) {
+        const promptText = typeof randomPrompt === 'object' ? randomPrompt.prompt : randomPrompt;
+        const promptHtml = `<p><i><strong>AI Prompt:</strong> ${promptText}</i></p><p><br></p>`;
+        // Prepend prompt
+        editorRef.current.innerHTML = promptHtml + editorRef.current.innerHTML;
+        toast.success('AI Prompt added!');
+      }
+    } catch {
+      toast.error('Failed to get AI prompt');
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
   const openNew = () => {
     setEditEntry(null);
     setForm({
@@ -154,6 +228,7 @@ export default function JournalPage() {
       tags: '',
       is_private: true,
       bg_color: '',
+      bg_image_url: '',
       font_style: '',
     });
     setShowForm(true);
@@ -171,6 +246,7 @@ export default function JournalPage() {
       tags: (entry.tags || []).join(', '),
       is_private: entry.is_private,
       bg_color: entry.bg_color || '',
+      bg_image_url: entry.image_url || '',
       font_style: entry.font_style || '',
     });
     setShowForm(true);
@@ -192,11 +268,15 @@ export default function JournalPage() {
     try {
       const content = editorRef.current?.innerHTML || '';
       const payload = {
-        ...form,
+        title: form.title,
+        entry_date: form.entry_date,
+        mood: form.mood || null,
+        is_private: form.is_private,
         content,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         bg_color: form.bg_color || null,
         font_style: form.font_style || null,
+        image_url: form.bg_image_url || null,
       };
 
       if (editEntry) {
@@ -227,6 +307,14 @@ export default function JournalPage() {
     }
   };
 
+  const onEmojiClick = (emojiObj) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertText', false, emojiObj.emoji);
+      setShowEmojiPicker(false);
+    }
+  };
+
   const filtered = entries.filter(e =>
     e.title?.toLowerCase().includes(search.toLowerCase()) ||
     (e.content || '').toLowerCase().includes(search.toLowerCase())
@@ -240,9 +328,19 @@ export default function JournalPage() {
           <h1 className="font-display text-2xl font-bold text-foreground">Journal</h1>
           <p className="text-muted-foreground text-sm">{entries.length} entries</p>
         </div>
-        <button onClick={openNew} className="neon-button flex items-center gap-2">
-          <Plus size={16} /> New Entry
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleAiSuggest} 
+            disabled={loadingAi} 
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all text-sm disabled:opacity-50 shadow-sm shadow-primary/10"
+          >
+            {loadingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            AI Suggest
+          </button>
+          <button onClick={openNew} className="neon-button flex items-center gap-2">
+            <Plus size={16} /> New Entry
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -301,7 +399,7 @@ export default function JournalPage() {
                     <button
                       type="button" key={m}
                       onClick={() => setForm({ ...form, mood: form.mood === m ? '' : m })}
-                      className={`text-lg p-0.5 rounded transition-all hover:scale-110 ${form.mood === m ? 'ring-1 ring-violet-400 bg-violet-500/10' : 'opacity-50 hover:opacity-100'}`}
+                      className={`text-lg p-0.5 rounded transition-all hover:scale-110 ${form.mood === m ? 'ring-1 ring-primary bg-primary/10' : 'opacity-50 hover:opacity-100'}`}
                     >
                       {m}
                     </button>
@@ -312,7 +410,7 @@ export default function JournalPage() {
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, is_private: !form.is_private })}
-                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all ${form.is_private ? 'bg-violet-500/20 text-violet-300' : 'bg-secondary text-muted-foreground'}`}
+                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all ${form.is_private ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'}`}
                 >
                   <Lock size={11} /> {form.is_private ? 'Private' : 'Public'}
                 </button>
@@ -324,7 +422,7 @@ export default function JournalPage() {
                       type="button" key={bg.value}
                       onClick={() => setForm({ ...form, bg_color: bg.value })}
                       title={bg.label}
-                      className={`w-5 h-5 rounded-full border-2 transition-all ${form.bg_color === bg.value ? 'border-white scale-110' : 'border-transparent hover:scale-105'}`}
+                      className={`w-5 h-5 rounded-full border-2 transition-all ${form.bg_color === bg.value ? 'border-primary scale-110 shadow-lg' : 'border-border/50 hover:scale-105'}`}
                       style={{ background: bg.value || '#1f2937' }}
                     />
                   ))}
@@ -336,11 +434,18 @@ export default function JournalPage() {
                   value={form.font_style}
                   onChange={e => setForm({ ...form, font_style: e.target.value })}
                 >
-                  <option value="">Default Font</option>
-                  <option value="serif">Serif</option>
-                  <option value="monospace">Monospace</option>
-                  <option value="cursive">Cursive</option>
+                  {FONTS.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
                 </select>
+                
+                {/* Background Image URL */}
+                <div className="flex-1 min-w-[150px]">
+                  <input
+                     className="bg-secondary text-foreground rounded px-2 py-1 w-full border-none outline-none text-xs placeholder:text-muted-foreground shadow-sm"
+                     placeholder="Bg Image URL (optional)"
+                     value={form.bg_image_url}
+                     onChange={e => setForm({ ...form, bg_image_url: e.target.value })}
+                  />
+                </div>
               </div>
 
               {/* Tags */}
@@ -355,17 +460,51 @@ export default function JournalPage() {
               </div>
 
               {/* Rich Text Editor */}
-              <div className="mx-5 mt-3 rounded-xl overflow-hidden border border-border/50">
-                <RichToolbar editorRef={editorRef} onImageUpload={handleImageUpload} uploading={uploading} />
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="min-h-48 max-h-96 overflow-y-auto p-4 text-sm text-foreground outline-none leading-relaxed"
-                  style={{ background: form.bg_color || undefined, fontFamily: form.font_style || undefined }}
-                  data-placeholder="Write your thoughts…"
-                  onInput={() => { /* handled on submit via innerHTML */ }}
+              <div className="mx-5 mt-3 rounded-xl overflow-hidden border border-border/50 relative">
+                <RichToolbar
+                  editorRef={editorRef}
+                  onImageUpload={handleImageUpload}
+                  uploading={uploading}
+                  onEmojiToggle={() => setShowEmojiPicker(!showEmojiPicker)}
                 />
+                
+                {/* Embedded Emoji Picker */}
+                {showEmojiPicker && (
+                  <div className="absolute top-12 left-2 shadow-2xl z-50 animate-in">
+                      <EmojiPicker 
+                        onEmojiClick={onEmojiClick}
+                        theme="auto"
+                        lazyLoadEmojis={true}
+                        width={300}
+                        height={400}
+                      />
+                  </div>
+                )}
+
+                {/* Editor Container with optional Background Image */}
+                <div className="relative min-h-[12rem] max-h-96 overflow-y-auto">
+                   {form.bg_image_url && (
+                     <div 
+                        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay blur-[2px]"
+                        style={{ backgroundImage: `url(${form.bg_image_url})` }}
+                     />
+                   )}
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    className={`relative z-10 w-full min-h-[12rem] p-4 text-sm outline-none leading-relaxed prose-journal ${form.bg_color && form.bg_color.includes('hsl') ? 'text-slate-900' : 'text-foreground'}`}
+                    style={{ background: form.bg_color || undefined, fontFamily: form.font_style || undefined }}
+                    data-placeholder="Write your thoughts…"
+                    onInput={() => { /* handled on submit via innerHTML */ }}
+                    onClick={(e) => {
+                      if (e.target.tagName === 'IMG') {
+                        const newWidth = prompt('Enter image width (e.g. 50% or 300px):', e.target.style.width || '100%');
+                        if (newWidth) e.target.style.width = newWidth;
+                      }
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Actions */}
@@ -386,7 +525,7 @@ export default function JournalPage() {
       {/* Entries List */}
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-12 text-center">
@@ -420,10 +559,28 @@ export default function JournalPage() {
           color: hsl(215 20% 45%);
           pointer-events: none;
         }
-        [contenteditable] img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
-        [contenteditable] blockquote { border-left: 3px solid #8B5CF6; padding-left: 12px; color: hsl(215 20% 65%); margin: 8px 0; font-style: italic; }
-        [contenteditable] h2 { font-size: 1.1rem; font-weight: 700; margin: 8px 0 4px; }
+        [contenteditable] img { 
+          max-width: 100%; 
+          border-radius: 12px; 
+          margin: 12px 0; 
+          border: 1px solid var(--border); 
+          transition: all 0.3s; 
+          cursor: pointer;
+        }
+        [contenteditable] img.selected {
+          outline: 3px solid var(--primary);
+          outline-offset: 4px;
+        }
+        [contenteditable] blockquote { border-left: 3px solid var(--primary); padding-left: 12px; color: hsl(215 20% 65%); margin: 8px 0; font-style: italic; }
+        [contenteditable] h1 { font-size: 1.5rem; font-weight: 800; margin: 16px 0 8px; font-family: 'Clash Display', sans-serif; }
+        [contenteditable] h2 { font-size: 1.25rem; font-weight: 700; margin: 12px 0 6px; font-family: 'Clash Display', sans-serif; }
+        [contenteditable] h3 { font-size: 1.1rem; font-weight: 700; margin: 8px 0 4px; }
+        [contenteditable] h4 { font-size: 1rem; font-weight: 700; margin: 6px 0 3px; }
+        [contenteditable] h5 { font-size: 0.9rem; font-weight: 700; margin: 4px 0 2px; }
+        [contenteditable] h6 { font-size: 0.85rem; font-weight: 700; margin: 2px 0 1px; }
         [contenteditable] ul { list-style: disc; padding-left: 18px; }
+        [contenteditable] ol { list-style: decimal; padding-left: 18px; }
+        .prose-journal p { margin-bottom: 0.5rem; }
       `}</style>
     </div>
   );
@@ -433,11 +590,17 @@ export default function JournalPage() {
 function EntryCard({ entry, expanded, onToggle, onEdit, onDelete }) {
   return (
     <div
-      className="glass-card overflow-hidden group transition-all"
+      className="glass-card overflow-hidden group transition-all relative"
       style={{ background: entry.bg_color || undefined }}
     >
+      {entry.bg_image_url && (
+         <div 
+            className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 mix-blend-overlay blur-[3px]"
+            style={{ backgroundImage: `url(${entry.bg_image_url})` }}
+         />
+      )}
       {/* Header */}
-      <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={onToggle}>
+      <div className="flex items-start gap-3 p-4 cursor-pointer relative z-10" onClick={onToggle}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {entry.mood && <span className="text-lg">{entry.mood}</span>}
@@ -451,7 +614,7 @@ function EntryCard({ entry, expanded, onToggle, onEdit, onDelete }) {
             {entry.tags?.length > 0 && (
               <div className="flex gap-1 flex-wrap">
                 {entry.tags.slice(0, 3).map(tag => (
-                  <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">
+                  <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
                     {tag}
                   </span>
                 ))}
@@ -475,7 +638,7 @@ function EntryCard({ entry, expanded, onToggle, onEdit, onDelete }) {
       {/* Expanded Content */}
       {expanded && entry.content && (
         <div
-          className="px-4 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/30 prose-journal"
+          className="px-4 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/30 prose-journal relative z-10"
           style={{ fontFamily: entry.font_style || undefined }}
           dangerouslySetInnerHTML={{ __html: entry.content }}
         />

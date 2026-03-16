@@ -54,6 +54,10 @@ export default {
       animation: {
         'slide-up': 'slide-up 0.3s ease-out',
       },
+      fontFamily: {
+        display: ['Clash Display', 'DM Sans', 'sans-serif'],
+        sans: ['Cabinet Grotesk', 'DM Sans', 'sans-serif'],
+      },
     },
   },
   plugins: [require('tailwindcss-animate')],

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { taskService } from '../services';
-import { Play, Pause, RotateCcw, Coffee, Timer, CheckCircle, History } from 'lucide-react';
+import { Play, Pause, RotateCcw, Coffee, Timer, CheckCircle, History, AlertTriangle, Lock } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const FOCUS_DURATION = 25 * 60;  // 25 minutes in seconds
 const BREAK_DURATION = 5 * 60;   // 5 minutes
@@ -23,6 +24,8 @@ export default function FocusModePage() {
     });
     const [tasks, setTasks] = useState([]);
     const [selectedTask, setSelectedTask] = useState(null);
+    const [strictMode, setStrictMode] = useState(false);
+    const [strictViolation, setStrictViolation] = useState(false);
     const intervalRef = useRef(null);
     const totalTime = mode === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
 
@@ -55,7 +58,7 @@ export default function FocusModePage() {
     };
 
     useEffect(() => {
-        if (running) {
+        if (running && !strictViolation) {
             intervalRef.current = setInterval(() => {
                 setTimeLeft(t => {
                     if (t <= 1) {
@@ -71,7 +74,7 @@ export default function FocusModePage() {
             clearInterval(intervalRef.current);
         }
         return () => clearInterval(intervalRef.current);
-    }, [running]);
+    }, [running, strictViolation]);
 
     // Update browser tab title
     useEffect(() => {
@@ -83,6 +86,36 @@ export default function FocusModePage() {
         }
         return () => { document.title = 'Planora'; };
     }, [timeLeft, running, mode]);
+
+    // Strict Mode: Visibility Change Detection
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && running && strictMode && mode === 'focus') {
+                // User left the tab
+                setStrictViolation(true);
+                toast.error('Stay focused! Strict mode is active.', {
+                    icon: '⚠️',
+                    duration: 5000
+                });
+            }
+        };
+
+        const handleBeforeUnload = (e) => {
+            if (running && strictMode && mode === 'focus') {
+                e.preventDefault();
+                e.returnValue = 'You are in strict focus mode! Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [running, strictMode, mode]);
 
 
     const toggleTimer = () => setRunning(r => !r);
@@ -102,7 +135,29 @@ export default function FocusModePage() {
     const strokeOffset = CIRCUMFERENCE * (1 - progress);
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="space-y-6 max-w-2xl mx-auto relative">
+            
+            {/* Strict Mode Overlay */}
+            {strictViolation && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                    <div className="text-center space-y-6 max-w-sm">
+                        <div className="w-24 h-24 mx-auto rounded-full bg-rose-500/20 flex items-center justify-center animate-pulse border border-rose-500/50">
+                            <AlertTriangle size={48} className="text-rose-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-display font-bold text-rose-500 mb-2">Focus Lost!</h2>
+                            <p className="text-lg text-foreground/80">You switched tabs during strict mode.</p>
+                        </div>
+                        <button
+                            onClick={() => setStrictViolation(false)}
+                            className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 px-8 rounded-2xl w-full text-lg shadow-[0_0_30px_rgba(244,63,94,0.4)] transition-all active:scale-95"
+                        >
+                            I will stay focused
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div>
                 <h1 className="font-display text-2xl font-bold text-foreground">Focus Mode</h1>
                 <p className="text-muted-foreground text-sm">Deep work with the Pomodoro technique</p>
@@ -111,7 +166,7 @@ export default function FocusModePage() {
             {/* Mode tabs */}
             <div className="flex gap-2">
                 <button onClick={() => switchMode('focus')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${mode === 'focus' ? 'bg-violet-600 text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${mode === 'focus' ? 'bg-primary text-white shadow-[0_0_15px_var(--primary-glow)]' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
                     <Timer size={15} /> Focus (25 min)
                 </button>
                 <button onClick={() => switchMode('break')}
@@ -127,12 +182,12 @@ export default function FocusModePage() {
                         <circle cx="100" cy="100" r={RADIUS} stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="none" />
                         <circle
                             cx="100" cy="100" r={RADIUS}
-                            stroke={mode === 'focus' ? '#8B5CF6' : '#10B981'}
+                            stroke={mode === 'focus' ? 'var(--primary)' : '#10B981'}
                             strokeWidth="8" fill="none"
                             strokeDasharray={CIRCUMFERENCE}
                             strokeDashoffset={strokeOffset}
                             strokeLinecap="round"
-                            style={{ transition: 'stroke-dashoffset 1s linear', filter: `drop-shadow(0 0 8px ${mode === 'focus' ? '#8B5CF6' : '#10B981'})` }}
+                            style={{ transition: 'stroke-dashoffset 1s linear', filter: `drop-shadow(0 0 8px ${mode === 'focus' ? 'var(--primary-glow)' : 'rgba(16,185,129,0.4)'})` }}
                         />
                     </svg>
                     <div className="absolute flex flex-col items-center">
@@ -140,6 +195,19 @@ export default function FocusModePage() {
                         <span className="text-xs text-muted-foreground mt-1 capitalize">{mode === 'focus' ? '🎯 Focus time' : '☕ Take a break'}</span>
                     </div>
                 </div>
+
+                {/* Strict Mode Toggle */}
+                {mode === 'focus' && (
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                        <button
+                            onClick={() => setStrictMode(!strictMode)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${strictMode ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-secondary text-muted-foreground hover:bg-white/5 border border-transparent'}`}
+                        >
+                            <AlertTriangle size={14} />
+                            Strict Mode: {strictMode ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
+                )}
 
                 {/* Controls */}
                 <div className="flex items-center justify-center gap-4 mt-6">
@@ -149,7 +217,7 @@ export default function FocusModePage() {
                     <button
                         onClick={toggleTimer}
                         className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-semibold text-white transition-all hover:scale-105 ${mode === 'focus'
-                            ? 'bg-gradient-to-r from-violet-600 to-indigo-600 shadow-[0_0_20px_rgba(139,92,246,0.4)]'
+                            ? 'bg-primary shadow-[0_0_20px_var(--primary-glow)]'
                             : 'bg-gradient-to-r from-emerald-600 to-green-600 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
                             }`}
                     >
@@ -159,10 +227,10 @@ export default function FocusModePage() {
                 </div>
 
                 {/* Task selector */}
-                <div className="mt-6">
-                    <label className="text-xs text-muted-foreground mb-2 block">Focusing on:</label>
+                <div className="mt-6 flex flex-col items-center">
+                    <label className="text-xs text-muted-foreground mb-2 block font-medium">Focusing on:</label>
                     <select
-                        className="input-field text-sm max-w-xs"
+                        className="input-field text-sm max-w-xs text-center"
                         value={selectedTask?.id || ''}
                         onChange={e => setSelectedTask(tasks.find(t => t.id === e.target.value) || null)}
                     >
@@ -171,6 +239,11 @@ export default function FocusModePage() {
                             <option key={t.id} value={t.id}>{t.title}</option>
                         ))}
                     </select>
+                    {strictMode && running && (
+                        <p className="text-[10px] text-amber-500 mt-2 flex items-center gap-1 animate-pulse">
+                            <Lock size={10} /> Tab lock active (Strict Mode)
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -178,14 +251,14 @@ export default function FocusModePage() {
             {sessions.length > 0 && (
                 <div className="glass-card p-5">
                     <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-                        <History size={18} className="text-violet-400" />
+                        <History size={18} className="text-primary" />
                         Session History
                     </h2>
                     <div className="space-y-2">
                         {sessions.slice(0, 10).map(s => (
                             <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
-                                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                    <CheckCircle size={16} className="text-violet-400" />
+                                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                    <CheckCircle size={16} className="text-primary" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-foreground truncate">{s.task}</p>
@@ -199,7 +272,7 @@ export default function FocusModePage() {
                     </div>
                     <div className="mt-3 pt-3 border-t border-border/50">
                         <p className="text-xs text-muted-foreground">
-                            Total: <span className="text-violet-400 font-semibold">{sessions.length} sessions</span> · {sessions.length * 25} min focused
+                            Total: <span className="text-primary font-semibold">{sessions.length} sessions</span> · {sessions.length * 25} min focused
                         </p>
                     </div>
                 </div>
@@ -211,6 +284,7 @@ export default function FocusModePage() {
                 <ul className="space-y-2 text-xs text-muted-foreground">
                     <li>• Focus deeply for 25 minutes, then take a 5-minute break</li>
                     <li>• After 4 pomodoros, take a longer break (15-30 minutes)</li>
+                    <li>• <b>Strict Mode:</b> Turn this on to get warned if you leave this tab!</li>
                     <li>• Put your phone away and close unrelated tabs during focus time</li>
                     <li>• Track what you worked on to see your daily productivity!</li>
                 </ul>

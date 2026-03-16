@@ -102,11 +102,11 @@ export default function HabitsPage() {
         <div className="glass-card p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-foreground">Today's Progress</span>
-            <span className="text-sm text-violet-400">{habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%</span>
+            <span className="text-sm text-primary">{habits.length > 0 ? Math.round((completedToday / habits.length) * 100) : 0}%</span>
           </div>
           <div className="h-3 bg-secondary rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(139,92,246,0.5)]"
+              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-700 shadow-[0_0_10px_hsl(var(--primary)/0.3)]"
               style={{ width: `${habits.length > 0 ? (completedToday / habits.length) * 100 : 0}%` }}
             />
           </div>
@@ -115,25 +115,40 @@ export default function HabitsPage() {
 
       {/* Analysis Chart */}
       {habits.length > 0 && (
-        <div className="glass-card p-5 border border-violet-500/20">
+        <div className="glass-card p-5 border border-primary/20">
           <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-sm">
-            <BarChart3 size={16} className="text-violet-400" /> 7-Day Completion Rate
+            <BarChart3 size={16} className="text-primary" /> 7-Day Completion Rate
           </h2>
           <div className="h-48 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                <Tooltip
-                  cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}
-                  contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px' }}
-                  formatter={(val) => [`${val}%`, 'Completion Rate']}
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} 
                 />
-                <Bar dataKey="rate" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.rate >= 80 ? '#10B981' : entry.rate >= 40 ? '#8B5CF6' : '#6366F1'} />
-                  ))}
-                </Bar>
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} 
+                />
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))', 
+                    borderRadius: '8px', 
+                    fontSize: '12px',
+                    color: 'hsl(var(--foreground))'
+                  }}
+                  formatter={(val) => [`${val}%`, 'Completion']}
+                />
+                <Bar 
+                  dataKey="rate" 
+                  fill="#8B5CF6"
+                  radius={[4, 4, 0, 0]} 
+                  barSize={24}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -141,7 +156,7 @@ export default function HabitsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /></div>
       ) : habits.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Flame size={40} className="text-muted-foreground mx-auto mb-3" />
@@ -153,7 +168,7 @@ export default function HabitsPage() {
           {habits.map(habit => {
             const doneToday = habit.habit_logs?.some(l => l.log_date === today && l.completed);
             return (
-              <div key={habit.id} className={`glass-card p-4 group transition-all ${doneToday ? 'opacity-75' : ''}`}>
+              <div key={habit.id} className={`glass-card p-4 group transition-all hover:bg-primary/5 dark:hover:bg-primary/10 ${doneToday ? 'opacity-75' : ''}`}>
                 <div className="flex items-center gap-4">
                   {/* Complete button */}
                   <button
@@ -180,8 +195,8 @@ export default function HabitsPage() {
                           key={day.toISOString()}
                           className="w-5 h-5 rounded-md flex items-center justify-center"
                           style={{
-                            background: isLoggedOn(habit, day) ? habit.color + '60' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${isLoggedOn(habit, day) ? habit.color + '80' : 'rgba(255,255,255,0.1)'}`
+                            background: isLoggedOn(habit, day) ? habit.color + '60' : 'hsl(var(--muted) / 0.5)',
+                            border: `1px solid ${isLoggedOn(habit, day) ? habit.color + '80' : 'hsl(var(--foreground) / 0.15)'}`
                           }}
                           title={format(day, 'EEE, MMM d')}
                         >
@@ -234,7 +249,7 @@ export default function HabitsPage() {
                 <div className="flex flex-wrap gap-2">
                   {ICONS.map(icon => (
                     <button type="button" key={icon} onClick={() => setForm({ ...form, icon })}
-                      className={`text-2xl p-1.5 rounded-lg transition-all ${form.icon === icon ? 'bg-violet-600/30 ring-1 ring-violet-500' : 'hover:bg-white/5'}`}>
+                      className={`text-2xl p-1.5 rounded-lg transition-all ${form.icon === icon ? 'bg-primary/20 ring-1 ring-primary/50 text-primary' : 'hover:bg-white/5'}`}>
                       {icon}
                     </button>
                   ))}

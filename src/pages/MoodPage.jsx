@@ -122,7 +122,7 @@ export default function MoodPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /></div>
       ) : (
         <>
           {/* Today's Mood Logging */}
@@ -137,10 +137,10 @@ export default function MoodPage() {
                     onClick={() => setSelectedMood(mood)}
                     className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all duration-200 hover:scale-110
                       ${selectedMood?.label === mood.label
-                        ? 'scale-125 ring-2 bg-white/10'
+                        ? 'scale-125 ring-2 bg-primary/10'
                         : 'opacity-60 hover:opacity-90'
                       }`}
-                    style={selectedMood?.label === mood.label ? { ringColor: mood.color } : {}}
+                    style={selectedMood?.label === mood.label ? { ringColor: 'var(--primary)' } : {}}
                   >
                     <span className="text-4xl">{mood.emoji}</span>
                     <span className="text-xs capitalize text-muted-foreground">{mood.label}</span>
@@ -156,7 +156,7 @@ export default function MoodPage() {
                       {EMOTIONS.map(e => (
                         <button key={e} onClick={() => toggleEmotion(e)}
                           className={`text-xs px-3 py-1.5 rounded-full transition-all ${selectedEmotions.includes(e)
-                            ? 'bg-violet-600 text-white shadow-[0_0_10px_rgba(139,92,246,0.3)]'
+                            ? 'bg-primary text-white shadow-[0_0_10px_var(--primary-glow)]'
                             : 'bg-secondary text-muted-foreground hover:text-foreground'
                             }`}>
                           {e}
@@ -181,7 +181,7 @@ export default function MoodPage() {
               )}
             </div>
           ) : (
-            <div className="glass-card p-5 border border-emerald-500/20">
+            <div className="glass-card p-5 border" style={{ borderColor: MOODS.find(m => m.label === todayMood.mood_label)?.color + '20' }}>
               <div className="flex items-center gap-4">
                 <span className="text-5xl">{MOODS.find(m => m.label === todayMood.mood_label)?.emoji || '😊'}</span>
                 <div>
@@ -189,7 +189,7 @@ export default function MoodPage() {
                   <p className="text-sm text-muted-foreground">Score: {todayMood.mood_score}/10</p>
                   {todayMood.emotions?.length > 0 && (
                     <div className="flex gap-1 mt-2 flex-wrap">
-                      {todayMood.emotions.map(e => <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">{e}</span>)}
+                      {todayMood.emotions.map(e => <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">{e}</span>)}
                     </div>
                   )}
                 </div>
@@ -224,33 +224,53 @@ export default function MoodPage() {
           {chartData.length > 0 && (
             <div className="glass-card p-5">
               <h2 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-                <TrendingUp size={18} className="text-violet-400" />
+                <TrendingUp size={18} className="text-primary" />
                 30-Day Mood Trend
               </h2>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="moodFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#666' }} />
-                  <YAxis domain={[1, 10]} tick={{ fontSize: 10, fill: '#666' }} width={20} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(224,20%,9%)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', fontSize: '12px' }}
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} 
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <Area type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#moodFill)" dot={{ fill: '#8B5CF6', r: 3 }} />
+                  <YAxis 
+                    domain={[1, 10]} 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} 
+                    width={20}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                   <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      borderColor: 'hsl(var(--border))', 
+                      borderRadius: '8px', 
+                      fontSize: '12px',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                    formatter={(value, name, props) => [`Score: ${value} (${props.payload.label})`, 'Mood']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="score" 
+                    stroke="#F43F5E" 
+                    fill="#F43F5E" 
+                    fillOpacity={0.1}
+                    strokeWidth={2} 
+                    dot={{ fill: '#F43F5E', r: 2 }}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           )}
 
           {/* AI Mood vs Productivity Insight */}
-          <div className="glass-card p-5 border border-violet-500/20">
+          <div className="glass-card p-5 border border-primary/20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
-                <Sparkles size={18} className="text-violet-400" />
+                <Sparkles size={18} className="text-primary" />
                 AI Mood Analysis
               </h2>
               {!aiInsight && !loadingAi && (
@@ -262,13 +282,13 @@ export default function MoodPage() {
 
             {loadingAi ? (
               <div className="py-8 flex flex-col items-center justify-center space-y-3">
-                <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                 <p className="text-xs text-muted-foreground animate-pulse">Gemini is looking for patterns...</p>
               </div>
             ) : aiInsight ? (
               <div className="space-y-4 animate-in">
                 {aiInsight.patterns && (
-                  <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
                     <p className="text-sm text-foreground leading-relaxed">{aiInsight.patterns}</p>
                   </div>
                 )}
@@ -307,7 +327,7 @@ export default function MoodPage() {
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(mood.log_date), 'MMM d')}</span>
                   <button onClick={() => startEdit(mood)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-violet-400 transition-all">
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-primary transition-all">
                     <Edit3 size={13} />
                   </button>
                 </div>
@@ -330,8 +350,10 @@ export default function MoodPage() {
             <div className="grid grid-cols-3 gap-2 mb-4">
               {MOODS.map(m => (
                 <button key={m.label} onClick={() => setEditMood(m)}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${editMood?.label === m.label ? 'border-violet-500/50 bg-violet-600/20' : 'border-border hover:border-violet-500/30'
-                    }`}>
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${editMood?.label === m.label 
+                    ? 'border-primary/50 bg-primary/20' 
+                    : 'border-border hover:border-primary/30'
+                  }`}>
                   <span className="text-xl">{m.emoji}</span>
                   <span className="text-xs text-foreground capitalize">{m.label}</span>
                 </button>
@@ -343,7 +365,7 @@ export default function MoodPage() {
               <div className="flex flex-wrap gap-2">
                 {EMOTIONS.map(e => (
                   <button key={e} onClick={() => setEditEmotions(prev => prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e])}
-                    className={`text-xs px-3 py-1.5 rounded-full transition-all ${editEmotions.includes(e) ? 'bg-violet-600/30 text-violet-300 border border-violet-500/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    className={`text-xs px-3 py-1.5 rounded-full transition-all ${editEmotions.includes(e) ? 'bg-primary text-white border border-primary/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
                     {e}
                   </button>
                 ))}

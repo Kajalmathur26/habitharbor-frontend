@@ -39,6 +39,15 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
+  const googleLogin = async (credential) => {
+    const res = await authService.googleLogin({ token: credential });
+    const { token, user } = res.data;
+    localStorage.setItem('planora_token', token);
+    localStorage.setItem('planora_user', JSON.stringify(user));
+    setUser(user);
+    return user;
+  };
+
   const register = async (name, email, password) => {
     const res = await authService.register({ name, email, password });
     const { token, user } = res.data;
@@ -61,7 +70,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

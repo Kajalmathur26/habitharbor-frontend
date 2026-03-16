@@ -5,7 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import {
   LayoutDashboard, CheckSquare, BookOpen, Calendar, Target, Flame,
   Heart, Sparkles, Settings, LogOut, Menu, X, Bell, Moon, Sun,
-  ChevronRight, DollarSign, Timer, Search
+  ChevronRight, DollarSign, Timer, Search, Shield
 } from 'lucide-react';
 import { searchService } from '../../services';
 import toast from 'react-hot-toast';
@@ -57,7 +57,7 @@ function SearchModal({ onClose }) {
       <div className="w-full max-w-xl glass-card p-4 glow-border animate-in" onClick={e => e.stopPropagation()}>
         <div className="relative mb-3">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          {searching && <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />}
+          {searching && <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />}
           <input
             ref={inputRef}
             className="input-field pl-10 pr-10"
@@ -143,7 +143,7 @@ export default function Layout() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-6 border-b border-border/50">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.4)] flex-shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/40 flex-shrink-0">
           <span className="text-white text-sm font-bold">P</span>
         </div>
         {sidebarOpen && (
@@ -163,7 +163,7 @@ export default function Layout() {
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer group
               ${isActive
-                ? 'bg-violet-600/20 text-violet-600 dark:text-violet-300 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]'
+                ? 'bg-primary/20 text-primary border border-primary/20 shadow-lg shadow-primary/10'
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'
               }`
             }
@@ -172,6 +172,23 @@ export default function Layout() {
             {sidebarOpen && <span className="text-sm font-medium">{label}</span>}
           </NavLink>
         ))}
+
+        {user?.role === 'admin' && (
+          <NavLink
+            to="/admin"
+            onClick={() => setMobileSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer group border-t border-border/20 pt-4 mt-4
+              ${isActive
+                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-500/10'
+                : 'text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10'
+              }`
+            }
+          >
+            <Shield size={18} className="flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm font-medium">Admin Panel</span>}
+          </NavLink>
+        )}
       </nav>
 
       <div className="px-3 py-4 border-t border-border/50 space-y-1">
@@ -179,7 +196,7 @@ export default function Layout() {
           to="/settings"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer
-            ${isActive ? 'bg-violet-600/20 text-violet-600 dark:text-violet-300' : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'}`
+            ${isActive ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'}`
           }
         >
           <Settings size={18} className="flex-shrink-0" />
@@ -199,7 +216,7 @@ export default function Layout() {
             {user?.avatar_url ? (
               <img src={user.avatar_url} alt="avatar" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-xs font-bold">{user?.name?.charAt(0).toUpperCase()}</span>
               </div>
             )}
@@ -223,7 +240,7 @@ export default function Layout() {
         <SidebarContent />
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-violet-600 border border-violet-500 flex items-center justify-center cursor-pointer hover:bg-violet-500 transition-colors z-10"
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-primary border border-primary/20 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity z-10 text-primary-foreground"
         >
           <ChevronRight size={12} className={`text-white transition-transform ${sidebarOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -278,7 +295,7 @@ export default function Layout() {
             {user?.avatar_url ? (
               <img src={user.avatar_url} alt="avatar" className="w-8 h-8 rounded-lg object-cover cursor-pointer" onClick={() => navigate('/settings')} />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center cursor-pointer" onClick={() => navigate('/settings')}>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center cursor-pointer text-primary-foreground" onClick={() => navigate('/settings')}>
                 <span className="text-white text-xs font-bold">{user?.name?.charAt(0).toUpperCase()}</span>
               </div>
             )}

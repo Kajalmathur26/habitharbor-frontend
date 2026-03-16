@@ -13,10 +13,11 @@ export const ThemeProvider = ({ children }) => {
 
   const ACCENT_COLORS = {
     violet: '261 83% 68%',
-    teal: '175 70% 41%',
+    indigo: '239 84% 67%',
+    blue: '217 91% 60%',
+    emerald: '160 84% 39%',
     rose: '346 87% 60%',
-    amber: '45 93% 47%',
-    blue: '217 91% 60%'
+    amber: '45 93% 47%'
   };
 
   useEffect(() => {

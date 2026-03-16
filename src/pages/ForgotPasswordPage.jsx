@@ -26,8 +26,8 @@ export default function ForgotPasswordPage() {
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-mesh-gradient opacity-40 pointer-events-none" />
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="w-full max-w-md relative animate-in">
                 <Link to="/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
                 </Link>
 
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-[0_0_40px_rgba(139,92,246,0.4)] mb-4 animate-[float_3s_ease-in-out_infinite]">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary shadow-[0_0_40px_var(--primary-glow)] mb-4 animate-[float_3s_ease-in-out_infinite]">
                         <span className="text-white text-2xl font-bold">P</span>
                     </div>
                     <h1 className="font-display text-3xl font-bold text-foreground mb-1">
@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
                             <div className="text-center">
                                 <p className="text-muted-foreground text-sm">
                                     Remember your password?{' '}
-                                    <Link to="/login" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
+                                    <Link to="/login" disable-tw-text-color="true" className="text-primary hover:opacity-80 font-medium transition-colors">
                                         Sign in
                                     </Link>
                                 </p>
